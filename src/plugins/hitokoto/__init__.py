@@ -45,6 +45,11 @@ _cache_lock = asyncio.Lock()
 _cache_length_limit = config.cache_length_limit
 _cache_timeout = config.cache_timeout
 
+if _is_debug:
+    logger.debug("_is_enable is {}".format(_is_enable))
+    logger.debug("_control_type is {}".format(_control_type))
+    logger.debug("_control_list_user is {}".format(_control_list_user))
+    logger.debug("_control_list_group is {}".format(_control_list_group))
 
 @scheduler.scheduled_job("interval", seconds=_cache_timeout,id="handle_yiyan_cache")
 async def handle_yiyan_cache():
@@ -70,14 +75,25 @@ async def handle_yiyan(bot: Bot,event: MessageEvent, args: Message = CommandArg(
         return
     if isinstance(event, GroupMessageEvent) and not config.is_allow_group:
         return
-    _uid = event.user_id if _message_type == "User" else event.group_id
+
+    _uid = event.user_id # 用户qq
     if _control_type == "blacklist":
-        if (_uid in _control_list_user) or (_uid in _control_list_group):
+        if _uid in _control_list_user:
             return
     elif _control_type == "whitelist":
-        if (_uid not in _control_list_user) and (_uid not in _control_list_group):
+        if _uid not in _control_list_user:
             return
-    # 过滤逻辑
+    # 对用户的封禁 > 群聊封禁
+    # 群聊封禁不针对个人qq号
+    if _message_type=="group":
+        _group_id = event.group_id
+        if _control_type == "blacklist":
+            if _group_id in _control_list_group:
+                return
+        elif _control_type == "whitelist":
+            if _group_id not in _control_list_group:
+                return
+    # 过滤逻辑 end
 
     if _is_debug:
         logger.debug("handle_yiyan CommandArg(): {}, user_id is : {}".format(args,event.user_id))
