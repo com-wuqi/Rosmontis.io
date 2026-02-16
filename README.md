@@ -3,7 +3,7 @@
 ## How to start
 
 
-4. run your bot using `nb run --reload` .
+1. run your bot using `nb run --reload` .
 
 ## Documentation
 

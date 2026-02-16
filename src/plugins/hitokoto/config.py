@@ -6,7 +6,7 @@ from typing import List
 class Config(BaseModel):
     """Plugin Config Here"""
     is_enable: bool = True
-    is_debug: bool = True
+    is_debug: bool = False
     is_use_cache: bool = True
     cache_timeout: int = 90 # 单位 秒
     cache_length_limit: int = 100
