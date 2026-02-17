@@ -4,8 +4,7 @@ from nonebot.plugin import PluginMetadata
 
 from .config import Config
 from .models import *
-from .setupai import *
-from .chater import *
+
 
 __plugin_meta__ = PluginMetadata(
     name="aiHelper",
@@ -16,3 +15,8 @@ __plugin_meta__ = PluginMetadata(
 )
 
 config = get_plugin_config(Config)
+config = config.aihelper
+
+if config.is_enable:
+    from .setupai import *
+    from .chater import *

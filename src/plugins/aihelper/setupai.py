@@ -10,7 +10,8 @@ from .models import *
 from nonebot_plugin_orm import async_scoped_session
 from sqlalchemy import select, update, delete
 from .aihelper_handles import get_model_names
-_superusers = get_driver().config.superusers
+
+_superusers = get_driver().config.selfhostaiusers
 _superusers = [int(k) for k in _superusers]
 # 这里提供通过对话修改数据库的方法
 

@@ -23,6 +23,8 @@ __plugin_meta__ = PluginMetadata(
 # _superusers = get_driver().config.superusers
 
 config = get_plugin_config(Config)
+config = config.hitokoto
+
 _is_debug = config.is_debug
 _is_enable = config.is_enable and (config.is_allow_user or config.is_allow_group)
 _is_enable_blacklist = config.is_enable_blacklist and (len(config.blacklist_groups)>0 or len(config.blacklist_users)>0)

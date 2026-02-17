@@ -3,7 +3,7 @@ from typing import List
 from pydantic import BaseModel
 from typing import List
 
-class Config(BaseModel):
+class ScopedConfig(BaseModel):
     """Plugin Config Here"""
     is_enable: bool = True
     is_debug: bool = False
@@ -30,3 +30,6 @@ class Config(BaseModel):
     blacklist_users: List[int] = []
 
 
+class Config(BaseModel):
+    """插件主配置，包含作用域"""
+    hitokoto: ScopedConfig  # 字段名建议与插件名一致

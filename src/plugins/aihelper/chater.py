@@ -192,5 +192,4 @@ async def auto_zip_chat_in_memory():
 # TODO: 增加 手动 压缩数据库内会话
 # TODO: (自动) 压缩数据库内容 需要: session_id + _locks 锁的持有 + _ai_switch开关不存在 或者为 False
 
-# TODO: 替换掉 setupai 通过 SUPERUSERS 判断用户 为其他 自定义 .env
 # TODO: 补全 easyhelper 插件. 实现帮助内容
