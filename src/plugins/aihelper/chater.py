@@ -162,7 +162,6 @@ async def remove_memory_ai_handle(event: MessageEvent):
 async def auto_zip_chat_in_memory():
     session = get_scoped_session()
     session_ids = list(_ai_switch.keys())
-    row = await get_config_by_id(sid=1,session=session)
     for session_id in session_ids:
 
         if _ai_switch.get(session_id, True):
@@ -180,6 +179,9 @@ async def auto_zip_chat_in_memory():
         except KeyError:
             continue
         # 内存中过小或不存在的不需要压缩
+
+        row = await get_config_by_id(sid=session_id, session=session)
+        # 自动清理的token由session发起者承担, 或者是 id=1 承担
 
         async with lock:
             _prompt = [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容并**严格保留**system提示词: {json.dumps(_Messages_dicts[session_id])}"}]

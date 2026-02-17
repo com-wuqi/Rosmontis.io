@@ -20,3 +20,4 @@ config = config.aihelper
 if config.is_enable:
     from .setupai import *
     from .chater import *
+    from .sqlmaintance import *
