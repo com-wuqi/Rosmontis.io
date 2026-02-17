@@ -52,27 +52,13 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
     lock = get_session_lock(session_id)
     async with lock:
         _ai_switch[session_id] = True
-        smt = select(Settings).where(Settings.user_id == event.user_id)
-        result = await session.execute(smt)
-        row = result.scalars().first()
-        if row is None:
-            logger.debug(f"用户 {event.user_id} 无配置，使用默认配置 (id=1)")
-            smt_default = select(Settings).where(Settings.id == 1)
-            result_default = await session.execute(smt_default)
-            row_default = result_default.scalars().first()
-            if row_default is None:
-                # 极端情况：默认配置不存在
-                logger.error("数据库中没有 id=1 的默认配置，请检查数据初始化！")
-                await start_ai.finish("配置异常")
-            _config_settings[session_id]=row_default
-            logger.debug(f"配置: {row_default.id}")
-        else:
-            _config_settings[session_id] = row
-            logger.debug(f"配置: {row.id}")
 
-        stmt = select(AIHelperComments).where(AIHelperComments.comment_id == session_id)
-        result = await session.execute(stmt)
-        raw = result.scalars().first()
+        row = await get_config_by_id(sid=session_id,session=session)
+        _config_settings[session_id] = row
+        logger.debug(f"配置: {row.id}")
+
+        raw = await get_comments_by_id(sid=session_id,session=session)
+
         if raw is not None and raw.message:
             try:
                 _Messages_dicts[session_id] = json.loads(raw.message)
@@ -106,9 +92,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
     async with lock:
         _ai_switch[session_id] = False
         # 这里不回收加载的配置文件
-        stmt = select(AIHelperComments).where(AIHelperComments.comment_id == session_id)
-        result = await session.execute(stmt)
-        raw = result.scalars().first()
+        raw = await get_comments_by_id(sid=session_id,session=session)
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
@@ -121,6 +105,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
                 raw = AIHelperComments(comment_id=session_id,message=json.dumps(_Messages_dicts[session_id]))
                 session.add(raw)
             await session.commit()
+
         else:
             pass
 
@@ -177,9 +162,7 @@ async def remove_memory_ai_handle(event: MessageEvent):
 async def auto_zip_chat_in_memory():
     session = get_scoped_session()
     session_ids = list(_ai_switch.keys())
-    smt = select(Settings).where(Settings.id == 1)
-    result = await session.execute(smt)
-    row = result.scalars().first()
+    row = await get_config_by_id(sid=1,session=session)
     for session_id in session_ids:
 
         if _ai_switch.get(session_id, True):
@@ -205,8 +188,9 @@ async def auto_zip_chat_in_memory():
 
     await session.close()
 
-# TODO: 增加 自动 压缩数据库内会话 (取代 auto_zip_chat_in_memory() )
+# TODO: 增加 自动 压缩数据库内会话 ( 不取代 auto_zip_chat_in_memory() )
 # TODO: 增加 手动 压缩数据库内会话
 # TODO: (自动) 压缩数据库内容 需要: session_id + _locks 锁的持有 + _ai_switch开关不存在 或者为 False
+
 # TODO: 替换掉 setupai 通过 SUPERUSERS 判断用户 为其他 自定义 .env
 # TODO: 补全 easyhelper 插件. 实现帮助内容
