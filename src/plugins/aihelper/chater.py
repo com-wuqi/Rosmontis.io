@@ -129,10 +129,15 @@ async def ai_chat_handle(event: MessageEvent):
             _Messages_dicts[session_id] = []
             _raw_message: list = _Messages_dicts[session_id]
 
-        if session_type == "PrivateMessageEvent":
-            _raw_message.append({"role": "user", "content": f"{msg}"})
+        if msg.split()[0] == "system" and event.user_id == _config_settings[session_id].user_id:
+            # 判断: 是system提示词+是配置所有者
+            await ai_chat.send("system hook by user: {}".format(event.user_id))
+            _raw_message.append({"role": "system", "content": f"{msg}"})
         else:
-            _raw_message.append({"role": "system", "content": f"用户{event.user_id}: {msg}"})
+            if session_type == "PrivateMessageEvent":
+                _raw_message.append({"role": "user", "content": f"{msg}"})
+            else:
+                _raw_message.append({"role": "user", "content": f"用户{event.user_id}: {msg}"})
 
         _event_setting = _config_settings[session_id]
         _res = await send_messages_to_ai(
@@ -157,7 +162,7 @@ async def remove_memory_ai_handle(event: MessageEvent):
         _Messages_dicts[session_id] = []
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
 
-# 自动压缩逻辑(内存中, 目前用途不大)
+# 自动压缩逻辑(内存中, 缺少测试)
 @scheduler.scheduled_job("interval", seconds=60,id="auto_zip_chat_in_memory")
 async def auto_zip_chat_in_memory():
     session = get_scoped_session()
@@ -184,7 +189,9 @@ async def auto_zip_chat_in_memory():
         # 自动清理的token由session发起者承担, 或者是 id=1 承担
 
         async with lock:
-            _prompt = [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容并**严格保留**system提示词: {json.dumps(_Messages_dicts[session_id])}"}]
+            _system_lists = [k for k in _Messages_dicts[session_id] if k["role"] == "system"]
+            # 正确保留所以system提示词
+            _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {json.dumps(_Messages_dicts[session_id])}"}]
             _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt)
             _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res}"}]
 
@@ -193,5 +200,3 @@ async def auto_zip_chat_in_memory():
 # TODO: 增加 自动 压缩数据库内会话 ( 不取代 auto_zip_chat_in_memory() )
 # TODO: 增加 手动 压缩数据库内会话
 # TODO: (自动) 压缩数据库内容 需要: session_id + _locks 锁的持有 + _ai_switch开关不存在 或者为 False
-
-# TODO: 补全 easyhelper 插件. 实现帮助内容
