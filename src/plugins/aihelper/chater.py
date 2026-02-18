@@ -1,4 +1,3 @@
-from nonebot.typing import T_State
 import json
 from nonebot import on_command,on_message
 from nonebot import get_driver,require
@@ -157,9 +156,9 @@ async def ai_chat_handle(event: MessageEvent):
             messages=_raw_message,
             temperature=_event_setting.temperature
         )
-        _raw_message.append({"role": "assistant", "content": f"{_res}"})
+        _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
 
-    await ai_chat.finish(_res)
+    await ai_chat.finish(_res.content)
 
 
 @remove_memory_ai.handle()
@@ -211,7 +210,7 @@ async def auto_zip_chat_in_memory():
             # 正确保留system提示词, 提取交互信息
             _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {[k for k in _Messages_dicts[session_id] if k["role"] != "system"]}"}]
             _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt,temperature=1.0)
-            _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res}"}]
+            _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res.content}"}]
 
     await session.close()
 

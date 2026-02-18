@@ -1,3 +1,4 @@
+from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select, update, delete
 from .models import *
 from nonebot.log import logger
@@ -7,10 +8,13 @@ from typing import List, Dict
 import asyncio
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
-
+from . import config
+from .tools import *
+import httpx
 
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
+semaphore_websearch = asyncio.Semaphore(50) # 网络搜索最大并发
 
 async def get_model_names(key:str,url:str) -> List[str]:
     async with semaphore:
@@ -26,15 +30,16 @@ async def get_model_names(key:str,url:str) -> List[str]:
             return []
 
 
-async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> str:
+async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
+            tools=[WEB_SEARCH_TOOL],
             temperature=temperature
         )
-        return chat_completion.choices[0].message.content
+        return chat_completion.choices[0].message
 
 
 async def get_config_by_id(sid: int,session: async_scoped_session):
@@ -62,3 +67,54 @@ async def get_comments_by_id(sid: int,session: async_scoped_session):
         raw = result.scalars().first()
         return raw
 
+async def call_web_search(
+        query: str,
+        summary: bool = True,
+        count: int = 10,
+        timeout: float = 60
+) -> Dict:
+    """
+    异步调用 Web Search API（兼容 httpx）
+
+    Args:
+        query: 搜索关键词
+        summary: 是否返回摘要（默认 True）
+        count: 返回结果数量（默认 10）
+        timeout: 请求超时时间（默认 60秒）
+
+    Returns:
+        清洗后的 JSON 响应字典，若出错则包含 error 字段
+    """
+    headers = {
+        "Authorization": f"Bearer {config.websearch_api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "query": query,
+        "summary": summary,
+        "count": count
+    }
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        try:
+            response = await client.post(
+                config.websearch_base_url,
+                headers=headers,
+                json=payload  # httpx 会自动序列化字典为 JSON
+            )
+            response.raise_for_status()
+            raw_data = response.json()
+            data = {}
+            _ids = 0
+            for d in raw_data['data']["webPages"]["value"]:
+                data[_ids] = {"name": d["name"], "url": d["url"], "summary": d["summary"]}
+                _ids += 1
+            return data
+        except httpx.TimeoutException:
+            return {"error": "请求超时"}
+        except httpx.HTTPStatusError as e:
+            return {"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}
+        except KeyError as e:
+            return {"error": f"keyError: {e}"}
+        except Exception as e:
+            return {"error": f"请求异常: {str(e)}"}
