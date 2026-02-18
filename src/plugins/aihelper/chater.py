@@ -154,7 +154,8 @@ async def ai_chat_handle(event: MessageEvent):
         _res = await send_messages_to_ai(
             key=_event_setting.api_key,url=_event_setting.url,
             model_name=_event_setting.model_name,
-            messages=_raw_message
+            messages=_raw_message,
+            temperature=_event_setting.temperature
         )
         _raw_message.append({"role": "assistant", "content": f"{_res}"})
 
@@ -209,7 +210,7 @@ async def auto_zip_chat_in_memory():
             _system_lists = [k for k in _Messages_dicts[session_id] if k["role"] == "system"]
             # 正确保留所以system提示词
             _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {json.dumps(_Messages_dicts[session_id])}"}]
-            _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt)
+            _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt,temperature=1.0)
             _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res}"}]
 
     await session.close()

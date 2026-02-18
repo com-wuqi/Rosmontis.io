@@ -26,13 +26,13 @@ async def get_model_names(key:str,url:str) -> List[str]:
             return []
 
 
-async def send_messages_to_ai(key:str,url:str,model_name:str,messages:List[Dict[str,str]]) -> str:
+async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> str:
     async with semaphore:
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=1
+            temperature=temperature
         )
         return chat_completion.choices[0].message.content
 
