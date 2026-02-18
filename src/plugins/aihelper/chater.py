@@ -208,8 +208,8 @@ async def auto_zip_chat_in_memory():
 
         async with lock:
             _system_lists = [k for k in _Messages_dicts[session_id] if k["role"] == "system"]
-            # 正确保留所以system提示词
-            _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {json.dumps(_Messages_dicts[session_id])}"}]
+            # 正确保留system提示词, 提取交互信息
+            _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {[k for k in _Messages_dicts[session_id] if k["role"] != "system"]}"}]
             _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt,temperature=1.0)
             _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res}"}]
 
