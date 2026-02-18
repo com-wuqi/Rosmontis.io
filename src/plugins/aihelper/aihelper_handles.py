@@ -31,7 +31,8 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,messages:List[Dict[
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
         chat_completion = await client.chat.completions.create(
             model=model_name,
-            messages=messages
+            messages=messages,
+            temperature=1
         )
         return chat_completion.choices[0].message.content
 

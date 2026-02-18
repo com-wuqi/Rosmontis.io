@@ -129,11 +129,22 @@ async def ai_chat_handle(event: MessageEvent):
             _Messages_dicts[session_id] = []
             _raw_message: list = _Messages_dicts[session_id]
 
-        if msg.split()[0] == "system" and event.user_id == _config_settings[session_id].user_id:
-            # 判断: 是system提示词+是配置所有者
-            await ai_chat.send("system hook by user: {}".format(event.user_id))
-            _raw_message.append({"role": "system", "content": f"{msg}"})
+        if msg.split()[0] == "system":
+            # 判断: 是system提示词+(私聊/群聊(管理员/所有者))
+            if session_type == "PrivateMessageEvent":
+                await ai_chat.send("system hook by user: {}".format(event.user_id))
+                _raw_message.append({"role": "system", "content": f"{msg}"})
+            elif event.sender.role == "admin" or event.sender.role == "owner":
+                await ai_chat.send("system hook by user: {}".format(event.user_id))
+                _raw_message.append({"role": "system", "content": f"{msg}"})
+            else:
+                await ai_chat.send("system hook auth failed : user: {}".format(event.user_id))
+                if session_type == "PrivateMessageEvent":
+                    _raw_message.append({"role": "user", "content": f"{msg}"})
+                else:
+                    _raw_message.append({"role": "user", "content": f"用户{event.user_id}: {msg}"})
         else:
+            # 常规对话
             if session_type == "PrivateMessageEvent":
                 _raw_message.append({"role": "user", "content": f"{msg}"})
             else:
@@ -152,14 +163,20 @@ async def ai_chat_handle(event: MessageEvent):
 
 @remove_memory_ai.handle()
 async def remove_memory_ai_handle(event: MessageEvent):
-    session_id,_= get_comments_id(event)
+    session_id,session_type= get_comments_id(event)
     lock = get_session_lock(session_id)
     async with lock:
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
             await remove_memory_ai.finish("清理已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再清理")
-        _Messages_dicts[session_id] = []
+        if session_type == "GroupMessageEvent":
+            if event.sender.role == "admin" or event.sender.role == "owner":
+                _Messages_dicts[session_id] = []
+            else:
+                await remove_memory_ai.finish("sorry, you are not admin or owner")
+        else:
+            _Messages_dicts[session_id] = []
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
 
 # 自动压缩逻辑(内存中, 缺少测试)

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer, Text
+from sqlalchemy import String, Integer, Text, Float
 from typing import Optional, List
 from datetime import datetime
 from nonebot import require
@@ -15,8 +15,10 @@ class Settings(Model):
     model_name: Mapped[String] = mapped_column(String(255),nullable=False)
     max_length: Mapped[int] = mapped_column(Integer,nullable=False,default=15)
     # 组对话后压缩
-    system: Mapped[String] = mapped_column(String(255),nullable=False)
+    system: Mapped[str] = mapped_column(Text)
     # 系统提示词
+    temperature: Mapped[float] = mapped_column(Float,nullable=False,default=1.0)
+    # 增加温度
 
 class AIHelperComments(Model):
     __tablename__ = "aihelper_comments"
