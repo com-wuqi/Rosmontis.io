@@ -14,7 +14,8 @@ WEB_SEARCH_TOOL = {
                 "freshness": {
                     "type": "string",
                     "enum": ["noLimit", "oneDay", "oneWeek", "oneMonth", "oneYear"],
-                    "description": "时间范围，默认 noLimit。如果用户问'今天'或'最新'，用 oneDay"
+                    "description": "时间范围，默认 noLimit。如果用户问'今天'或'最新'，用 oneDay",
+                    "default": "noLimit"
                 },
                 "count": {
                     "type": "integer",

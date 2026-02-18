@@ -69,6 +69,7 @@ async def get_comments_by_id(sid: int,session: async_scoped_session):
 
 async def call_web_search(
         query: str,
+        freshness: str,
         summary: bool = True,
         count: int = 10,
         timeout: float = 60
@@ -81,9 +82,10 @@ async def call_web_search(
         summary: 是否返回摘要（默认 True）
         count: 返回结果数量（默认 10）
         timeout: 请求超时时间（默认 60秒）
+        freshness: 搜索指定时间范围内的网页 [noLimit,oneDay,oneWeek,oneMonth,oneYear]
 
     Returns:
-        清洗后的 JSON 响应字典，若出错则包含 error 字段
+        (数据清洗后的)字典，若出错则包含 error 字段, 成功为 success 字段
     """
     headers = {
         "Authorization": f"Bearer {config.websearch_api_key}",
@@ -92,7 +94,8 @@ async def call_web_search(
     payload = {
         "query": query,
         "summary": summary,
-        "count": count
+        "count": count,
+        "freshness": freshness,
     }
 
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -107,9 +110,10 @@ async def call_web_search(
             data = {}
             _ids = 0
             for d in raw_data['data']["webPages"]["value"]:
+                # 数据清洗
                 data[_ids] = {"name": d["name"], "url": d["url"], "summary": d["summary"]}
                 _ids += 1
-            return data
+            return {"success":data}
         except httpx.TimeoutException:
             return {"error": "请求超时"}
         except httpx.HTTPStatusError as e:
