@@ -72,7 +72,7 @@ async def call_web_search(
         freshness: str,
         summary: bool = True,
         count: int = 10,
-        timeout: float = 60
+        timeout: float = config.websearch_timeout
 ) -> Dict:
     """
     异步调用 Web Search API（兼容 httpx）

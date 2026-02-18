@@ -5,6 +5,7 @@ from nonebot.adapters.onebot.v11 import Message, MessageEvent, GroupMessageEvent
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_scoped_session
 from .aihelper_handles import *
+from . import config
 import asyncio
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
@@ -81,7 +82,7 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
             _raw_message: list = _Messages_dicts[session_id]
             _raw_message.append({"role": "system", "content": f"{_config_settings[session_id].system}"})
 
-        logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
+        # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
     await start_ai.finish("收到喵~ 会话建立")
 
 @stop_ai.handle()
@@ -137,11 +138,8 @@ async def ai_chat_handle(event: MessageEvent):
                 await ai_chat.send("system hook by user: {}".format(event.user_id))
                 _raw_message.append({"role": "system", "content": f"{msg}"})
             else:
-                await ai_chat.send("system hook auth failed : user: {}".format(event.user_id))
-                if session_type == "PrivateMessageEvent":
-                    _raw_message.append({"role": "user", "content": f"{msg}"})
-                else:
-                    _raw_message.append({"role": "user", "content": f"用户{event.user_id}: {msg}"})
+                await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
+
         else:
             # 常规对话
             if session_type == "PrivateMessageEvent":
@@ -150,15 +148,58 @@ async def ai_chat_handle(event: MessageEvent):
                 _raw_message.append({"role": "user", "content": f"用户{event.user_id}: {msg}"})
 
         _event_setting = _config_settings[session_id]
-        _res = await send_messages_to_ai(
-            key=_event_setting.api_key,url=_event_setting.url,
-            model_name=_event_setting.model_name,
-            messages=_raw_message,
-            temperature=_event_setting.temperature
-        )
-        _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
+        # 指定配置文件
 
-    await ai_chat.finish(_res.content)
+        _counts = 0
+        while _counts < config.websearch_max_once_calls:
+            _res = await send_messages_to_ai(
+                key=_event_setting.api_key,url=_event_setting.url,
+                model_name=_event_setting.model_name,
+                messages=_raw_message,
+                temperature=_event_setting.temperature
+            )
+            # 此处, ai可能尝试了调用工具
+            if not _res.tool_calls:
+                _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
+                break
+
+            _assistant_message = {
+                "role": "assistant",
+                "content": _res.content,  # 可能为 None，保留即可
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": tc.type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in _res.tool_calls
+                ]
+            }
+            _raw_message.append(_assistant_message)
+            for tool_call in _res.tool_calls:
+                # 保存 工具调用请求的上下文
+                if tool_call.function.name == "web_search":
+                    # 处理工具
+                    args = json.loads(tool_call.function.arguments)
+                    query = args.get("query")
+                    freshness = args.get("freshness","noLimit")
+                    count = args.get("count", 10)
+                    _searched = await call_web_search(query=query,freshness=freshness,count=count)
+                    _raw_message.append({"tool_call_id": tool_call.id,"role": "tool","content": str(_searched)})
+
+                else:
+                    pass
+
+            _counts +=1
+    # 锁释放
+    if _res.tool_calls:
+        _reply = "已执行多次工具调用，但未生成完整回答"
+    else:
+        _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
+    await ai_chat.finish(_reply)
 
 
 @remove_memory_ai.handle()

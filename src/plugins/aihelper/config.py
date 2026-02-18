@@ -6,6 +6,8 @@ class ScopedConfig(BaseModel):
     is_enable: bool
     websearch_base_url: str
     websearch_api_key: str
+    websearch_max_once_calls: int
+    websearch_timeout: int
 
 class Config(BaseModel):
     """插件主配置，包含作用域"""
