@@ -97,28 +97,28 @@ async def call_web_search(
         "count": count,
         "freshness": freshness,
     }
-
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        try:
-            response = await client.post(
-                config.websearch_base_url,
-                headers=headers,
-                json=payload  # httpx 会自动序列化字典为 JSON
-            )
-            response.raise_for_status()
-            raw_data = response.json()
-            data = {}
-            _ids = 0
-            for d in raw_data['data']["webPages"]["value"]:
-                # 数据清洗
-                data[_ids] = {"name": d["name"], "url": d["url"], "summary": d["summary"]}
-                _ids += 1
-            return {"success":data}
-        except httpx.TimeoutException:
-            return {"error": "请求超时"}
-        except httpx.HTTPStatusError as e:
-            return {"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}
-        except KeyError as e:
-            return {"error": f"keyError: {e}"}
-        except Exception as e:
-            return {"error": f"请求异常: {str(e)}"}
+    async with semaphore_websearch:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            try:
+                response = await client.post(
+                    config.websearch_base_url,
+                    headers=headers,
+                    json=payload  # httpx 会自动序列化字典为 JSON
+                )
+                response.raise_for_status()
+                raw_data = response.json()
+                data = {}
+                _ids = 0
+                for d in raw_data['data']["webPages"]["value"]:
+                    # 数据清洗, 字段更易于阅读
+                    data[_ids] = f"标题: {d['name']}\n, url: {d['url']}, 总结: {d['summary']}"
+                    _ids += 1
+                return {"success":data}
+            except httpx.TimeoutException:
+                return {"error": "请求超时"}
+            except httpx.HTTPStatusError as e:
+                return {"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}
+            except KeyError as e:
+                return {"error": f"keyError: {e}"}
+            except Exception as e:
+                return {"error": f"请求异常: {str(e)}"}

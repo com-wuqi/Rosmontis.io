@@ -27,6 +27,7 @@ _superusers = [int(k) for k in _superusers]
 start_ai = on_command("ai load",priority=4,block=True)
 stop_ai = on_command("ai save",priority=4,block=True)
 remove_memory_ai = on_command("ai remove",priority=80,block=False)
+zip_memory_ai = on_command("ai zip memory",priority=80,block=False)
 
 ai_chat = on_message(priority=8, block=False)
 # 处理非命令消息
@@ -45,6 +46,52 @@ def get_comments_id(event:MessageEvent):
     else:
         logger.error("fail to get comments type")
         return event.user_id,"unknown"
+
+def generate_zip_message(raw_message:list):
+    dialog_lines = []
+    _system = []
+    for msg in raw_message:
+        role = msg.get("role", "unknown")
+        if role == "system":
+            _system.append(msg)
+        elif role == "user":
+            # 处理系统和用户信息
+            content = msg.get("content",None)
+            if content is None:
+                content = ""
+            dialog_lines.append(f"{role}: {content}")
+        elif role == "assistant":
+            parts = []
+            if msg.get("content"):
+                parts.append(f"assistant: {msg['content']}")
+            tool_calls = msg.get("tool_calls")
+            if tool_calls and isinstance(tool_calls, list):
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    # 获取function字段
+                    func_name = func.get("name", "unknown")
+                    func_args = func.get("arguments", "{}")
+                    parts.append(f"[助手调用工具: {func_name} 参数: {func_args}]")
+            if not parts:
+                parts.append("assistant: (空)")
+            dialog_lines.append("\n".join(parts))
+        elif role == "tool" or role == "function":
+            content = msg.get("content","")
+            dialog_lines.append(f"工具返回: {content}")
+        else:
+            # 未知
+            dialog_lines.append(f"{role}: {msg.get('content', '')}")
+
+    _msg = _system + [{"role": "system", "content": "你是一个专业的对话总结助手，擅长提取核心信息，回答简洁明了。请关注助手调用了哪些工具及其作用。"},
+            {"role": "user","content":f"""请用**简洁的中文**总结以下对话的主要内容，包括讨论的主题、关键问题和结论。
+            如果对话中提到了具体任务或决定，请一并概括。
+            对话历史 : {chr(10).join(dialog_lines)}"""}]
+    return _msg,_system
+
+def chunk_messages(messages: list, chunk_size: int = 8) -> list:
+    """将消息列表分割成多个子块，每个块最多包含 chunk_size 条消息"""
+    return [messages[i:i + chunk_size] for i in range(0, len(messages), chunk_size)]
+
 
 @start_ai.handle()
 async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
@@ -220,6 +267,47 @@ async def remove_memory_ai_handle(event: MessageEvent):
             _Messages_dicts[session_id] = []
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
 
+@zip_memory_ai.handle()
+async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session):
+    session_id, session_type = get_comments_id(event)
+    lock = get_session_lock(session_id)
+    row = await get_config_by_id(sid=session_id, session=session)
+    async with lock:
+        try:
+            _ = _Messages_dicts[session_id]
+        except KeyError:
+            await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再压缩")
+
+        # 只要正常加载, 都会至少有一条system对话, 不需要其他异常处理
+        if session_type == "GroupMessageEvent" and (event.sender.role != "admin" and event.sender.role != "owner"):
+            # 权限不足
+            await zip_memory_ai.finish("sorry, you are not admin or owner")
+
+        # 执行
+        _chunks_zipped_messages = [] # 每一块压缩后的结果
+        _system_in_chunks = [] # 每一块里面的system
+        _msg_chunks = chunk_messages(_Messages_dicts[session_id])
+
+        for chunk in _msg_chunks:
+            # 对每个块单独压缩
+            _before_zip_msg,_system_in_chunk = generate_zip_message(chunk)
+            _system_in_chunks.extend(_system_in_chunk) # 展平
+            _res = await send_messages_to_ai(
+                key=row.api_key, url=row.url, model_name=row.model_name,
+                messages=_before_zip_msg, temperature=1.0
+            )
+            _chunks_zipped_messages.append(_res.content)
+
+        final_prompt = [{"role": "user",
+            "content": f"请将以下关于同一对话的多个片段摘要整合成一个连贯的总体总结：\n" + "\n".join(_chunks_zipped_messages)}]
+        _res = await send_messages_to_ai(
+            key=row.api_key, url=row.url, model_name=row.model_name,
+            messages=final_prompt, temperature=1.0
+        )
+        _Messages_dicts[session_id] = _system_in_chunks+[{"role": "system", "content": f"以下是对之前对话的总结：{_res.content}"}]
+        await zip_memory_ai.finish("压缩已完成: 一定要运行 ai save 否则视为放弃删除")
+
+
 # 自动压缩逻辑(内存中, 缺少测试)
 @scheduler.scheduled_job("interval", seconds=60,id="auto_zip_chat_in_memory")
 async def auto_zip_chat_in_memory():
@@ -247,14 +335,26 @@ async def auto_zip_chat_in_memory():
         # 自动清理的token由session发起者承担, 或者是 id=1 承担
 
         async with lock:
-            _system_lists = [k for k in _Messages_dicts[session_id] if k["role"] == "system"]
-            # 正确保留system提示词, 提取交互信息
-            _prompt = _system_lists + [{"role": "user", "content": f"请用**简洁的**中文总结以下对话的主要内容: {[k for k in _Messages_dicts[session_id] if k["role"] != "system"]}"}]
-            _res = await send_messages_to_ai(key=row.api_key,url=row.url,model_name=row.model_name,messages=_prompt,temperature=1.0)
+            _chunks_zipped_messages = []  # 每一块压缩后的结果
+            _msg_chunks = chunk_messages(_Messages_dicts[session_id])
+            for chunk in _msg_chunks:
+                # 对每个块单独压缩
+                _before_zip_msg = generate_zip_message(chunk)
+                _res = await send_messages_to_ai(
+                    key=row.api_key, url=row.url, model_name=row.model_name,
+                    messages=_before_zip_msg, temperature=1.0
+                )
+                _chunks_zipped_messages.append(_res.content)
+            final_prompt = [{"role": "user",
+                             "content": f"请将以下关于同一对话的多个片段摘要整合成一个连贯的总体总结：\n" + "\n".join(
+                                 _chunks_zipped_messages)}]
+            _res = await send_messages_to_ai(
+                key=row.api_key, url=row.url, model_name=row.model_name,
+                messages=final_prompt, temperature=1.0
+            )
             _Messages_dicts[session_id] = [{"role": "system", "content": f"以下是对之前对话的总结：{_res.content}"}]
 
     await session.close()
 
-# TODO: 增加 自动 压缩数据库内会话 ( 不取代 auto_zip_chat_in_memory() )
-# TODO: 增加 手动 压缩数据库内会话
+
 # TODO: (自动) 压缩数据库内容 需要: session_id + _locks 锁的持有 + _ai_switch开关不存在 或者为 False
