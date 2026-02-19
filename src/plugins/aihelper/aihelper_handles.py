@@ -67,6 +67,25 @@ async def get_comments_by_id(sid: int,session: async_scoped_session):
         raw = result.scalars().first()
         return raw
 
+async def save_comments_by_id(sid:int,session: async_scoped_session,msg:str):
+    async with semaphore_sql:
+        raw = AIHelperComments(comment_id=sid, message=msg)
+        session.add(raw)
+        await session.commit()
+
+async def update_comments_by_id(sid:int,session: async_scoped_session,msg:str) -> int:
+    async with semaphore_sql:
+        stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
+        result = await session.execute(stmt)
+        raw = result.scalars().first()
+        if raw is None:
+            return -1
+        raw.message = msg
+        session.add(raw)
+        await session.commit()
+        return 0
+
+
 async def call_web_search(
         query: str,
         freshness: str,

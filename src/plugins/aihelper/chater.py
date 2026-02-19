@@ -2,6 +2,7 @@ import json
 from nonebot import on_command,on_message
 from nonebot import get_driver,require
 from nonebot.adapters.onebot.v11 import Message, MessageEvent, GroupMessageEvent, PrivateMessageEvent
+from nonebot.internal.params import ArgPlainText
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_scoped_session
 from .aihelper_handles import *
@@ -27,7 +28,8 @@ _superusers = [int(k) for k in _superusers]
 start_ai = on_command("ai load",priority=4,block=True)
 stop_ai = on_command("ai save",priority=4,block=True)
 remove_memory_ai = on_command("ai remove",priority=80,block=False)
-zip_memory_ai = on_command("ai zip memory",priority=80,block=False)
+zip_memory_ai = on_command("ai zp mm",priority=80,block=False) # 缩写一下
+zip_db_ai = on_command("ai zp db",priority=80,block=False)
 
 ai_chat = on_message(priority=8, block=False)
 # 处理非命令消息
@@ -174,11 +176,13 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         if len(_Messages_dicts[session_id])>=0:
             #
             if raw is not None:
-                raw.message = json.dumps(_Messages_dicts[session_id])
+                # 存在记录
+                res = await update_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
+                if res == -1:
+                    logger.error("fail to update comments")
             else:
-                raw = AIHelperComments(comment_id=session_id,message=json.dumps(_Messages_dicts[session_id]))
-                session.add(raw)
-            await session.commit()
+                # 不存在记录
+                _ = await save_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
 
         else:
             pass
@@ -190,10 +194,10 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
 async def ai_chat_handle(event: MessageEvent):
     session_id,session_type = get_comments_id(event)
     if not _ai_switch.get(session_id, False):
-        await ai_chat.finish()  # 直接结束，不回复
+        return  # 直接结束，不回复
     msg = str(event.get_message()).strip()
     if not msg:
-        await ai_chat.finish()
+        return
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写
         try:
@@ -299,6 +303,7 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
     session_id, session_type = get_comments_id(event)
     lock = get_session_lock(session_id)
     row = await get_config_by_id(sid=session_id, session=session)
+    # 这里使用的时候内存中应该有配置信息, 但是压缩需要 token , 还是由发起者承担
     async with lock:
         try:
             _ = _Messages_dicts[session_id]
@@ -317,6 +322,42 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
         await zip_memory_ai.finish("压缩已完成: 一定要运行 ai save 否则视为放弃删除")
 
 
+@zip_db_ai.handle()
+async def zip_db_ai_handle():
+    await zip_db_ai.send("zip_db_ai.handle run...")
+
+
+@zip_db_ai.got("session_id",prompt="session_id：(默认值为当前会话id)")
+async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
+    session_id=-1
+    if not db_session_id.strip():
+        session_id, session_type = get_comments_id(event)
+        await zip_db_ai.send("session_id 未提供, 使用 {}".format(session_id))
+    else:
+        try:
+            session_id = int(db_session_id.strip())
+        except ValueError:
+            await zip_db_ai.reject("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
+    lock = get_session_lock(session_id)
+    row = await get_config_by_id(sid=session_id, session=session)
+    # 这里使用的时候内存中没有有配置信息, 但是压缩需要 token , 还是由发起者承担
+    # 如果按照这个思路处理, 群聊信息将无法被手动压缩, 必须引入参数: 会话id
+    # 这里的会话id就是数据库保存的id, 参考 get_comments_id , 群聊为群号, 私聊为个人qq号
+    # 此处同理, 由于优先级, 不需要判断开关 (自动任务需要)
+    async with lock:
+        _ai_switch[session_id] = False # 再覆写一下开关
+        raw_msg = await get_comments_by_id(sid=session_id, session=session)
+        if raw_msg is not None and raw_msg.message:
+            await zip_db_ai.send("开始处理...")
+            _raw_messages:list = json.loads(raw_msg.message)
+            _res = await common_zip_message(_input_msg=_raw_messages,row=row)
+            # 然后回写
+            _try_write = await update_comments_by_id(sid=session_id,session=session,msg=json.dumps(_res))
+            await zip_db_ai.finish("zip_db_ai. success")
+        else:
+            await zip_db_ai.finish("db is empty, finished")
+
+
 # 自动压缩逻辑(内存中, 缺少测试)
 @scheduler.scheduled_job("interval", seconds=60,id="auto_zip_chat_in_memory")
 async def auto_zip_chat_in_memory():
@@ -324,7 +365,7 @@ async def auto_zip_chat_in_memory():
     session_ids = list(_ai_switch.keys())
     for session_id in session_ids:
 
-        if _ai_switch.get(session_id, True):
+        if _ai_switch.get(session_id, False):
             continue
         lock = get_session_lock(session_id)
         try:
@@ -342,6 +383,7 @@ async def auto_zip_chat_in_memory():
 
         row = await get_config_by_id(sid=session_id, session=session)
         # 自动清理的token由session发起者承担, 或者是 id=1 承担
+        # 但是在群聊信息中, 这里一定会是 id=1 承担 token
 
         async with lock:
             _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])
@@ -349,5 +391,3 @@ async def auto_zip_chat_in_memory():
 
     await session.close()
 
-
-# TODO: (自动) 压缩数据库内容 需要: session_id + _locks 锁的持有 + _ai_switch开关不存在 或者为 False
