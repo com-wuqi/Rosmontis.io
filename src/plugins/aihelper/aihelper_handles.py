@@ -44,9 +44,10 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,m
 
 async def get_config_by_id(sid: int,session: async_scoped_session):
     async with semaphore_sql:
-        smt = select(Settings).where(Settings.user_id == sid)
+        smt = select(Settings).where(Settings.user_id == sid, Settings.is_enabled == 1)
         result = await session.execute(smt)
         row = result.scalars().first()
+        # 一般就提取第一个配置文件
         if row is None:
             logger.warning("confifg not found, use default config")
             smt_default = select(Settings).where(Settings.id == 1)

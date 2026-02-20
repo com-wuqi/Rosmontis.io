@@ -1,7 +1,5 @@
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer, Text, Float
-from typing import Optional, List
-from datetime import datetime
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, Text, Float, Boolean
 from nonebot import require
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import Model
@@ -19,6 +17,8 @@ class Settings(Model):
     # 系统提示词
     temperature: Mapped[float] = mapped_column(Float,nullable=False,default=1.0)
     # 增加温度
+    is_enabled: Mapped[bool] = mapped_column(Boolean,nullable=False,default=False)
+    # 默认不启用, 对 id=1 无效
 
 class AIHelperComments(Model):
     __tablename__ = "aihelper_comments"
