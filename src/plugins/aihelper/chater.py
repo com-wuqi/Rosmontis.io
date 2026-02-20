@@ -373,17 +373,17 @@ async def auto_zip_chat_in_memory():
         except asyncio.TimeoutError:
             continue  # 锁被占用，跳过
 
+        row = await get_config_by_id(sid=session_id, session=session)
+        # 自动清理的token由session发起者承担, 或者是 id=1 承担
+        # 但是在群聊信息中, 这里一定会是 id=1 承担 token
+
         try:
             _raw_message:list = _Messages_dicts[session_id]
-            if len(_raw_message)<=1:
+            if len(_raw_message)<=row.max_length:
                 continue
         except KeyError:
             continue
         # 内存中过小或不存在的不需要压缩
-
-        row = await get_config_by_id(sid=session_id, session=session)
-        # 自动清理的token由session发起者承担, 或者是 id=1 承担
-        # 但是在群聊信息中, 这里一定会是 id=1 承担 token
 
         async with lock:
             _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])

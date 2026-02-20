@@ -61,6 +61,26 @@ async def get_config_by_id(sid: int,session: async_scoped_session):
         return row
 
 
+async def get_all_config_by_id(sid: int,session: async_scoped_session):
+    async with semaphore_sql:
+        smt = select(Settings).where(Settings.user_id == sid)
+        result = await session.execute(smt)
+        row = result.scalars().all()
+        return row
+
+async def del_config_by_config_id_and_uid(config_id: int,uid: int,session: async_scoped_session):
+    async with semaphore_sql:
+        # 保证只能操作自己的配置
+        smt = select(Settings).where(Settings.id == config_id, Settings.user_id == uid)
+        result = await session.execute(smt)
+        _res = result.scalar_one_or_none()
+        if _res is None:
+            return -1
+        else:
+            await session.delete(_res)
+            await session.commit()
+            return 0
+
 async def get_comments_by_id(sid: int,session: async_scoped_session):
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)

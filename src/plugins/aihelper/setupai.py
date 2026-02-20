@@ -8,14 +8,38 @@ from nonebot import get_driver,require
 require("nonebot_plugin_orm")
 from .models import *
 from nonebot_plugin_orm import async_scoped_session
-from sqlalchemy import select, update, delete
-from .aihelper_handles import get_model_names
+from .aihelper_handles import get_model_names,get_all_config_by_id
 
 _superusers = get_driver().config.selfhostaiusers
 _superusers = [int(k) for k in _superusers]
 # 这里提供通过对话修改数据库的方法
 
-setup_ai = on_command("setupai")
+setup_ai = on_command("ai cf add") # 增加配置文件
+show_config = on_command("ai cf show") # 列出该用户配置
+
+@show_config.handle()
+async def show_config_handle(event: MessageEvent,session: async_scoped_session):
+    if isinstance(event, GroupMessageEvent):
+        await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
+    configs = await get_all_config_by_id(sid=event.user_id,session=session)
+    _result = []
+    if configs is not None:
+        _result.append("user_id: {}".format(event.user_id))
+        _result.append("")
+        for config in configs:
+            _result.append("config:")
+            _result.append("id: {}".format(config.id))
+            _result.append("url: {}".format(config.url))
+            _result.append("api_key: {}".format(config.api_key))
+            _result.append("model_name: {}".format(config.model_name))
+            _result.append("max_length: {}".format(config.max_length))
+            _result.append("system: {}".format(config.system))
+            _result.append("temperature: {}".format(config.temperature))
+            _result.append("is_enabled: {}".format(config.is_enabled))
+            _result.append("")
+        await show_config.finish("\n".join(_result))
+    else:
+        await show_config.finish("not found")
 
 @setup_ai.handle()
 async def setup_ai_handle(event: MessageEvent,state: T_State):
