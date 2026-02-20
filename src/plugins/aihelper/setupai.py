@@ -1,7 +1,7 @@
 from nonebot import get_driver, require
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Message, MessageEvent, GroupMessageEvent
-from nonebot.params import ArgPlainText
+from nonebot.params import ArgPlainText, CommandArg
 from nonebot.typing import T_State
 
 require("nonebot_plugin_orm")
@@ -13,8 +13,13 @@ _superusers = [int(k) for k in _superusers]
 
 setup_ai = on_command("ai cf add") # 增加配置文件
 show_config = on_command("ai cf show")  # 列出用户配置
-delete_config = on_command("ai cf delete")  # 删除用户配置
+delete_config = on_command("ai cf delete")  # 删除用户配置, 暂时不实现
 edit_config = on_command("ai cf edit")  # 编辑用户配置
+
+
+@edit_config.handle()
+async def edit_config_handle():
+    await edit_config.finish("不计划实现, 推荐删除配置后新建")
 
 @show_config.handle()
 async def show_config_handle(event: MessageEvent,session: async_scoped_session):
@@ -42,10 +47,13 @@ async def show_config_handle(event: MessageEvent,session: async_scoped_session):
 
 
 @delete_config.handle()
-async def delete_config_handle(event: MessageEvent, session: async_scoped_session, config_id: str = ArgPlainText()):
+async def delete_config_handle(event: MessageEvent, session: async_scoped_session, config_id: Message = CommandArg()):
     if isinstance(event, GroupMessageEvent):
         await delete_config.finish("处于安全考虑, 这个操作不允许在群聊中进行")
-    if not config_id.strip() and config_id.strip().isdigit():
+    config_id = config_id.extract_plain_text().strip()
+    if config_id == "1":
+        await delete_config.finish("操作失败")
+    if not config_id.strip() or not config_id.strip().isdigit():
         # isdigit() 判断纯数字
         await delete_config.finish("没有输入或者输入不合法: 要求提供配置id, 可以通过ai cf show获取")
     _res = await del_config_by_config_id_and_uid(session=session, config_id=int(config_id.strip()), uid=event.user_id)
