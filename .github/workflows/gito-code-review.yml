@@ -7,7 +7,7 @@ on:
     inputs:
       pr_number:
         description: "Pull Request number"
-        required: true
+        required: false          # 改为非必填，以支持纯代码审查模式
       comment:
         description: "Leave a review comment on the PR"
         type: boolean
@@ -18,11 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write   # 允许留下评论（即使不运行评论步骤，写权限仍保留）
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 0            # 获取完整历史，以便比较分支
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -35,21 +35,32 @@ jobs:
       - name: Run AI code analysis
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          # 使用 DeepSeek 官方 API（兼容 OpenAI 格式）
           LLM_API_TYPE: openai
           OPENAI_BASE_URL: https://api.deepseek.com
           MODEL: "deepseek-chat"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER_FROM_WORKFLOW_DISPATCH: ${{ github.event.inputs.pr_number }}
         run: |
+          # 判断运行模式
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -z "${{ github.event.inputs.pr_number }}" ]; then
+            echo "🟢 Manual run without PR number. Reviewing current branch against default branch..."
+            # 动态获取默认分支名（如 main/master）
+            DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+            gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}"
+          else
+            # PR 事件 或 手动运行但提供了 PR 编号：使用默认 review 命令
+            echo "🟢 Running in PR context or with provided PR number."
           gito --verbose review
-          # 根据手动输入的 comment 参数决定是否添加评论
+          fi
+          
+          # 条件评论：仅在提供了有效 PR 编号时尝试留下评论
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.comment }}" == "true" ]; then
+            # 手动运行：只有输入了 PR 编号且 comment 为 true 时才评论
+            if [ "${{ github.event.inputs.comment }}" == "true" ] && [ -n "${{ github.event.inputs.pr_number }}" ]; then
               gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
             fi
           else
-            # PR 事件自动触发时始终评论（可根据需要调整）
+            # PR 事件自动触发：始终评论（可根据需要调整）
             gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
           fi
 
