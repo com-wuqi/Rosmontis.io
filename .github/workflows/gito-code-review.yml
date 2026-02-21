@@ -43,24 +43,29 @@ jobs:
         run: |
           # 判断运行模式
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -z "${{ github.event.inputs.pr_number }}" ]; then
-            echo "🟢 Manual run without PR number. Reviewing current branch against default branch..."
-            # 动态获取默认分支名（如 main/master）
+            echo "🟢 Manual run without PR number. Attempting to review changes against default branch..."
             DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-            gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}"
+          
+            # 尝试审查变更（diff）
+            if gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}"; then
+              echo "✅ Changes found and reviewed."
+            else
+              # 如果审查失败（通常是因为无变更），则回退到全量审查
+              echo "⚠️ No changes found or diff review failed. Falling back to full codebase review..."
+              gito --verbose review --all
+            fi
           else
             # PR 事件 或 手动运行但提供了 PR 编号：使用默认 review 命令
             echo "🟢 Running in PR context or with provided PR number."
-          gito --verbose review
+            gito --verbose review
           fi
           
-          # 条件评论：仅在提供了有效 PR 编号时尝试留下评论
+          # 条件评论逻辑（保持不变）
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # 手动运行：只有输入了 PR 编号且 comment 为 true 时才评论
             if [ "${{ github.event.inputs.comment }}" == "true" ] && [ -n "${{ github.event.inputs.pr_number }}" ]; then
               gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
             fi
           else
-            # PR 事件自动触发：始终评论（可根据需要调整）
             gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
           fi
 
