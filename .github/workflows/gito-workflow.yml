@@ -1,4 +1,4 @@
-name: "Gito: AI Code Review (DeepSeek)"
+name: "Gito: AI Code Review (DeepSeek - Forced)"
 
 on:
   pull_request:
@@ -33,44 +33,80 @@ jobs:
       - name: Install Gito
         run: pip install gito.bot~=4.0
 
-      # ===== 彻底清除所有本地配置 =====
+      # ===== 彻底清除所有可能的本地配置 =====
       - name: 🔥 Wipe all local Gito config files
         run: |
-          # 删除项目级配置
           rm -f .gito/config.toml
-          # 删除用户级全局配置
           rm -f ~/.gito/.env
-          # 确保没有任何遗留文件
+          rm -f ~/.gito/config.toml  # 以防万一
           echo "All local configs removed."
 
-      # ===== 强制设置环境变量（多重保险）=====
-      - name: 🚀 Set DeepSeek environment variables
-        id: setenv
+      # ===== 强制设置环境变量（写入 $GITHUB_ENV 和 $GITHUB_PATH）=====
+      - name: 🚀 Force DeepSeek environment variables
         run: |
-          # 写入 GitHub Actions 环境变量文件，确保所有后续步骤都能继承
+          # 写入 $GITHUB_ENV，使所有后续步骤的 shell 都能继承
           echo "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" >> $GITHUB_ENV
           echo "OPENAI_API_KEY=${{ secrets.LLM_API_KEY }}" >> $GITHUB_ENV
           echo "LLM_API_TYPE=openai" >> $GITHUB_ENV
           echo "OPENAI_BASE_URL=https://api.deepseek.com" >> $GITHUB_ENV
           echo "OPENAI_API_BASE=https://api.deepseek.com" >> $GITHUB_ENV
           echo "MODEL=deepseek-chat" >> $GITHUB_ENV
-          # 可选：设置超时等
-          echo "OPENAI_TIMEOUT=60" >> $GITHUB_ENV
+          # 同时设置可能影响库行为的环境变量
+          echo "OPENAI_API_TYPE=openai" >> $GITHUB_ENV
+          echo "DEEPSEEK_API_KEY=${{ secrets.LLM_API_KEY }}" >> $GITHUB_ENV  # 备用
 
-      # ===== 验证配置（调试）=====
-      - name: 🔍 Verify environment
+      # ===== 打印环境变量（调试）=====
+      - name: 🔍 Debug environment variables
         run: |
-          echo "OPENAI_BASE_URL=$OPENAI_BASE_URL"
-          echo "OPENAI_API_BASE=$OPENAI_API_BASE"
-          echo "MODEL=$MODEL"
+          echo "OPENAI_BASE_URL = $OPENAI_BASE_URL"
+          echo "OPENAI_API_BASE = $OPENAI_API_BASE"
+          echo "MODEL = $MODEL"
+          echo "LLM_API_TYPE = $LLM_API_TYPE"
+          echo "OPENAI_API_TYPE = $OPENAI_API_TYPE"
+          # 打印密钥前缀和后缀（安全起见）
           KEY_PART="${OPENAI_API_KEY:0:5}...${OPENAI_API_KEY: -5}"
-          echo "API Key: $KEY_PART"
-          echo "LLM_API_TYPE=$LLM_API_TYPE"
+          echo "OPENAI_API_KEY = $KEY_PART"
+          # 检查是否存在潜在冲突的配置文件
+          echo "--- Checking for leftover config files ---"
+          find ~ -name ".env" -o -name "config.toml" 2>/dev/null | grep -E "(gito|openai)" || echo "No leftover configs found."
+
+      # ===== 使用 Python 脚本验证配置（最可靠）=====
+      - name: 🐍 Verify OpenAI client configuration with Python
+        run: |
+          python -c "
+  import os
+  from openai import OpenAI
+  
+  # 打印环境变量
+  print('ENV OPENAI_BASE_URL:', os.environ.get('OPENAI_BASE_URL'))
+  print('ENV OPENAI_API_BASE:', os.environ.get('OPENAI_API_BASE'))
+  
+  # 创建客户端并打印其 base_url
+  client = OpenAI(
+  api_key=os.environ.get('OPENAI_API_KEY'),
+  base_url=os.environ.get('OPENAI_BASE_URL') or os.environ.get('OPENAI_API_BASE')
+  )
+  print('Client base_url:', client.base_url)
+
+# 尝试一个简单的 API 调用（非流式，只验证连接）
+try:
+  # 仅用于测试连接，不会消耗大量 token
+  response = client.chat.completions.create(
+  model=os.environ.get('MODEL', 'deepseek-chat'),
+  messages=[{'role': 'user', 'content': 'Say "test"' } ],
+  max_tokens=5
+  )
+  print('✅ API connection successful!')
+  print('Response:', response.choices[0].message.content)
+except Exception as e:
+  print('❌ API connection failed:', e)
+  exit(1)
+  "
 
       # ===== 核心审查步骤 =====
       - name: 🤖 Run AI code review
         env:
-          # 再次显式设置（虽然已写入GITHUB_ENV，但双重保险）
+          # 再次显式设置，确保子进程继承
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_API_TYPE: openai
@@ -84,8 +120,8 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -z "${{ github.event.inputs.pr_number }}" ]; then
             echo "🟢 Manual run without PR number. Attempting to review changes against default branch..."
             DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          
-            TEMP_OUTPUT=$(mktemp)
+
+  TEMP_OUTPUT=$(mktemp)
             set +e
             gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}" 2>&1 | tee "$TEMP_OUTPUT"
             REVIEW_EXIT_CODE=${PIPESTATUS[0]}
