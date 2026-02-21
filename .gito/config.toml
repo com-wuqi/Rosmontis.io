@@ -1,0 +1,13 @@
+# .gito/config.toml
+
+[llm]
+# 显式指定类型，避免环境变量解析歧义
+type = "openai"
+# 填入你的自定义模型名称
+model = "deepseek-reasoner"
+
+[llm.openai]
+# 你的自定义 API Base URL
+api_base = "https://api.deepseek.com/v1"
+# 这里引用环境变量名，不要直接写 Key
+api_key = "{env.LLM_API_KEY}"

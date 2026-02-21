@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR 编号 (仅在没有 PR 关联时手动输入)"
+        description: "PR 编号 (仅在手动执行且想评论到 PR 时填)"
         required: false
 
 jobs:
@@ -38,45 +38,24 @@ jobs:
 
       - name: Run AI code review
         env:
-          # --- 核心配置：同时提供带前缀和不带前缀的变量，确保工具能认出来 ---
-          LLM_API_TYPE: "openai"
-          GITO_LLM_TYPE: "openai"
-
-          # 🚨 重要：请确认你在 GitHub Secrets 里存的名字到底是哪一个！
-          # 如果你存的是 LLM_API_KEY，就用 ${{ secrets.LLM_API_KEY }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          GITO_LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-
-          # 你的自定义 Base URL 和模型
-          LLM_API_BASE: "https://api.deepseek.com/v1"
-          GITO_LLM_API_BASE: "https://api.deepseek.com/v1"
-
-          MODEL: "deepseek-reasoner"
-          GITO_MODEL: "deepseek-reasoner"
-
-          # --- GitHub 相关 ---
+          # 只需要传这两个最核心的变量，其他的都在 config.toml 里
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 自动识别 PR 编号
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
 
+          # 获取 PR 编号用于评论
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
         run: |
-          # 调试语句：检查变量是否存在（不会打印具体的 KEY，只会显示长度）
-          echo "Checking environment variables..."
-          if [ -z "$LLM_API_KEY" ]; then echo "❌ Error: LLM_API_KEY is empty! Please check GitHub Secrets."; exit 1; fi
-          
-          # 1. 运行审查
+          # 运行审查 (Gito 会自动读取 .gito/config.toml)
           gito --verbose review
           
-          # 2. 生成运行摘要（在 Actions 页面直接看结果）
+          # 输出摘要到 Actions 页面（无论有没有 PR 都能看）
           if [ -f code-review-report.md ]; then
-            echo "### 🤖 AI Code Review Result" >> $GITHUB_STEP_SUMMARY
+            echo "### 🤖 AI Code Review Summary" >> $GITHUB_STEP_SUMMARY
             cat code-review-report.md >> $GITHUB_STEP_SUMMARY
           fi
 
-          # 3. 只有在 PR 环境下才尝试发评论
+          # 如果有 PR 编号，则发送 GitHub 评论
           if [ ! -z "$PR_NUMBER" ]; then
             export GITHUB_PR_NUMBER=$PR_NUMBER
             gito github-comment
-          else
-            echo "No PR number detected. Skipping GitHub comment, review summary is available in Job Summary."
           fi
