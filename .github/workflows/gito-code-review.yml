@@ -36,11 +36,18 @@ jobs:
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_API_TYPE: openai
+          # 同时设置多个可能的环境变量，确保覆盖
+          OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
           OPENAI_BASE_URL: https://api.deepseek.com
+          OPENAI_API_BASE: https://api.deepseek.com
           MODEL: "deepseek-chat"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER_FROM_WORKFLOW_DISPATCH: ${{ github.event.inputs.pr_number }}
         run: |
+          # 可选：打印环境变量以调试（注意不要泄露密钥）
+          echo "OPENAI_BASE_URL=${OPENAI_BASE_URL}"
+          echo "OPENAI_API_BASE=${OPENAI_API_BASE}"
+          # ... 后续命令保持不变
           # 判断运行模式
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -z "${{ github.event.inputs.pr_number }}" ]; then
             echo "🟢 Manual run without PR number. Attempting to review changes against default branch..."
