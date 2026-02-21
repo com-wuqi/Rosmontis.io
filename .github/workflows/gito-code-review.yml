@@ -40,16 +40,15 @@ jobs:
 
       - name: Run AI code review
         env:
-          # 1. 核心身份验证
+          # 核心配置：使用 GITO_ 前缀是 Python 版最稳妥的方式
+          GITO_LLM_TYPE: "openai"
+          GITO_LLM_API_KEY: ${{ secrets.CUSTOM_LLM_API_KEY }}
+          GITO_LLM_API_BASE: "https://your-custom-url.com/v1" # 确保这里是你的自定义 URL
+          GITO_MODEL: "your-custom-model-name"
+
+          # GitHub 相关
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LLM_API_KEY: ${{ secrets.CUSTOM_LLM_API_KEY }}
-
-          # 2. 自定义模型配置 (你要求的三个关键项)
-          LLM_API_TYPE: openai
-          LLM_API_BASE: "https://api.deepseek.com/v1" # 在这里填入你的自定义 Base URL
-          MODEL: "deepseek-reasoner"             # 在这里填入你的模型名称
-
-          # 3. 动态获取 PR 编号 (解决手动触发不工作的关键)
+          # 动态获取 PR 编号
           GITHUB_PR_NUMBER: >-
             ${{ 
               github.event.pull_request.number || 
@@ -57,9 +56,9 @@ jobs:
               github.event.inputs.pr_number 
             }}
         run: |
-          # 运行审查并生成报告
+          # 建议在运行前打印一下版本确认
+          gito --version
           gito --verbose review
-          # 将报告作为评论发布到 GitHub
           gito github-comment
 
       - name: Upload Results
