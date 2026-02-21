@@ -15,7 +15,10 @@ setup_ai = on_command("ai cf add") # 增加配置文件
 show_config = on_command("ai cf show")  # 列出用户配置
 delete_config = on_command("ai cf delete")  # 删除用户配置, 暂时不实现
 edit_config = on_command("ai cf edit")  # 编辑用户配置
+switch_config = on_command("ai cf switch")
 
+
+# 切换用户配置, 本质上是修改一个值, 用法 [sign]ai cf switch [config_id] bool([switch_int])
 
 @edit_config.handle()
 async def edit_config_handle():
@@ -30,20 +33,39 @@ async def show_config_handle(event: MessageEvent,session: async_scoped_session):
     if configs is not None:
         _result.append("user_id: {}".format(event.user_id))
         _result.append("")
-        for config in configs:
+        for in_config in configs:
             _result.append("config:")
-            _result.append("id: {}".format(config.id))
-            _result.append("url: {}".format(config.url))
-            _result.append("api_key: {}".format(config.api_key))
-            _result.append("model_name: {}".format(config.model_name))
-            _result.append("max_length: {}".format(config.max_length))
-            _result.append("system: {}".format(config.system))
-            _result.append("temperature: {}".format(config.temperature))
-            _result.append("is_enabled: {}".format(config.is_enabled))
+            _result.append("id: {}".format(in_config.id))
+            _result.append("url: {}".format(in_config.url))
+            _result.append("api_key: {}".format(in_config.api_key))
+            _result.append("model_name: {}".format(in_config.model_name))
+            _result.append("max_length: {}".format(in_config.max_length))
+            _result.append("system: {}".format(in_config.system))
+            _result.append("temperature: {}".format(in_config.temperature))
+            _result.append("is_enabled: {}".format(in_config.is_enabled))
             _result.append("")
         await show_config.finish("\n".join(_result))
     else:
         await show_config.finish("not found")
+
+
+@switch_config.handle()
+async def switch_config_handle(event: MessageEvent, session: async_scoped_session, switch: Message = CommandArg()):
+    if isinstance(event, GroupMessageEvent):
+        await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
+    switch_list = switch.extract_plain_text().strip().split()
+    if len(switch_list) != 2:
+        await switch_config.finish("需要两个参数: config_id:int switch:int")
+    if not switch_list[1].isdigit():
+        await switch_config.finish("switch:int 参数不合法")
+    if switch_list[0] == "1":
+        await switch_config.finish("操作失败")
+    _res = await switch_is_enable_by_id(config_id=int(switch_list[0]), session=session,
+                                        target=bool(int(switch_list[1])), user_id=event.user_id)
+    if _res != 0:
+        await switch_config.finish("404 not found")
+    else:
+        await switch_config.finish("ok")
 
 
 @delete_config.handle()

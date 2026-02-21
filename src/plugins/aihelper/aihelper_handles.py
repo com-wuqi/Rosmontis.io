@@ -1,11 +1,13 @@
-from openai.types.chat import ChatCompletionMessage
-from sqlalchemy import select, update, delete
-from .models import *
+import asyncio
+from typing import List, Dict
+
 from nonebot.log import logger
 from openai import AsyncOpenAI
-from nonebot import require
-from typing import List, Dict
-import asyncio
+from openai.types.chat import ChatCompletionMessage
+from sqlalchemy import select
+
+from .models import *
+
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
 from . import config
@@ -80,6 +82,19 @@ async def del_config_by_config_id_and_uid(config_id: int,uid: int,session: async
             await session.delete(_res)
             await session.commit()
             return 0
+
+
+async def switch_is_enable_by_id(config_id: int, session: async_scoped_session, target: bool, user_id: int) -> int:
+    async with semaphore_sql:
+        smt = select(Settings).where(Settings.id == config_id, Settings.user_id == user_id)
+        result = await session.execute(smt)
+        data = result.scalars().first()
+        if data is None:
+            return -1
+        data.is_enabled = target
+        session.add(data)
+        await session.commit()
+        return 0
 
 async def get_comments_by_id(sid: int,session: async_scoped_session):
     async with semaphore_sql:
