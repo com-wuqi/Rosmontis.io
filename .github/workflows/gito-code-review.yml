@@ -45,21 +45,29 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -z "${{ github.event.inputs.pr_number }}" ]; then
             echo "🟢 Manual run without PR number. Attempting to review changes against default branch..."
             DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          
-            # 尝试审查变更（diff）
-            if gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}"; then
-              echo "✅ Changes found and reviewed."
-            else
-              # 如果审查失败（通常是因为无变更），则回退到全量审查
-              echo "⚠️ No changes found or diff review failed. Falling back to full codebase review..."
+
+            # 运行 gito review，同时捕获其标准输出和错误输出到一个临时文件
+            TEMP_OUTPUT=$(mktemp)
+            set +e  # 临时关闭脚本的自动退出功能，以便我们检查命令结果
+            gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}" 2>&1 | tee "$TEMP_OUTPUT"
+            REVIEW_EXIT_CODE=${PIPESTATUS[0]}  # 获取 gito 命令的退出码
+            set -e  # 恢复自动退出
+
+            # 判断是否因“无变更”而失败
+            if [ $REVIEW_EXIT_CODE -ne 0 ] || grep -q "No changes to review" "$TEMP_OUTPUT"; then
+              echo "⚠️ No changes found or review command failed. Falling back to full codebase review..."
               gito --verbose review --all
+            else
+              echo "✅ Changes found and reviewed successfully."
             fi
+
+            rm -f "$TEMP_OUTPUT"
           else
             # PR 事件 或 手动运行但提供了 PR 编号：使用默认 review 命令
             echo "🟢 Running in PR context or with provided PR number."
             gito --verbose review
           fi
-          
+
           # 条件评论逻辑（保持不变）
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             if [ "${{ github.event.inputs.comment }}" == "true" ] && [ -n "${{ github.event.inputs.pr_number }}" ]; then
