@@ -1,17 +1,15 @@
-name: "Gito: AI Code Review"
+name: "Gito: AI Code Review (DeepSeek)"
 
 on:
-  # PR 事件自动触发
   pull_request:
     types: [ opened, synchronize, reopened ]
-  # 手动触发工作流
   workflow_dispatch:
     inputs:
       pr_number:
         description: "Pull Request number (leave empty to review current branch)"
         required: false
       comment:
-        description: "Leave a review comment on the PR (only works if pr_number is provided)"
+        description: "Leave a review comment on the PR (only if pr_number provided)"
         type: boolean
         default: true
 
@@ -20,10 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write   # 允许留下 PR 评论
+      pull-requests: write
 
     steps:
-      # 检出代码，获取完整历史（用于分支比较）
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -36,39 +33,47 @@ jobs:
       - name: Install Gito
         run: pip install gito.bot~=4.0
 
-      # 关键步骤：清理可能干扰的本地配置文件
-      # 如果存在 .gito/config.toml，将其重命名备份，避免解析错误
-      - name: Backup and ignore local config
+      # ===== 彻底清除所有本地配置 =====
+      - name: 🔥 Wipe all local Gito config files
         run: |
-          if [ -f .gito/config.toml ]; then
-            mv .gito/config.toml .gito/config.toml.bak
-            echo "⚠️ Local config backed up to .gito/config.toml.bak"
-          fi
+          # 删除项目级配置
+          rm -f .gito/config.toml
+          # 删除用户级全局配置
+          rm -f ~/.gito/.env
+          # 确保没有任何遗留文件
+          echo "All local configs removed."
 
-      # 调试：打印关键环境变量（不泄露完整密钥）
-      - name: Debug environment variables
-        env:
-          # 双重设置确保 OpenAI 库能识别
-          OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
-          OPENAI_BASE_URL: https://api.deepseek.com
-          OPENAI_API_BASE: https://api.deepseek.com
-          MODEL: deepseek-chat
+      # ===== 强制设置环境变量（多重保险）=====
+      - name: 🚀 Set DeepSeek environment variables
+        id: setenv
         run: |
-          echo "OPENAI_BASE_URL = $OPENAI_BASE_URL"
-          echo "OPENAI_API_BASE = $OPENAI_API_BASE"
-          echo "MODEL = $MODEL"
-          KEY_PREFIX="${OPENAI_API_KEY:0:5}"
-          KEY_SUFFIX="${OPENAI_API_KEY: -5}"
-          echo "API Key (prefix/suffix): ${KEY_PREFIX}...${KEY_SUFFIX}"
+          # 写入 GitHub Actions 环境变量文件，确保所有后续步骤都能继承
+          echo "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" >> $GITHUB_ENV
+          echo "OPENAI_API_KEY=${{ secrets.LLM_API_KEY }}" >> $GITHUB_ENV
+          echo "LLM_API_TYPE=openai" >> $GITHUB_ENV
+          echo "OPENAI_BASE_URL=https://api.deepseek.com" >> $GITHUB_ENV
+          echo "OPENAI_API_BASE=https://api.deepseek.com" >> $GITHUB_ENV
+          echo "MODEL=deepseek-chat" >> $GITHUB_ENV
+          # 可选：设置超时等
+          echo "OPENAI_TIMEOUT=60" >> $GITHUB_ENV
 
-      # 核心代码审查步骤
-      - name: Run AI code analysis
+      # ===== 验证配置（调试）=====
+      - name: 🔍 Verify environment
+        run: |
+          echo "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+          echo "OPENAI_API_BASE=$OPENAI_API_BASE"
+          echo "MODEL=$MODEL"
+          KEY_PART="${OPENAI_API_KEY:0:5}...${OPENAI_API_KEY: -5}"
+          echo "API Key: $KEY_PART"
+          echo "LLM_API_TYPE=$LLM_API_TYPE"
+
+      # ===== 核心审查步骤 =====
+      - name: 🤖 Run AI code review
         env:
-          # Gito 所需的环境变量
+          # 再次显式设置（虽然已写入GITHUB_ENV，但双重保险）
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_API_TYPE: openai
-          # 同时设置多种可能的 base_url 变量，确保覆盖
           OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_API_TYPE: openai
           OPENAI_BASE_URL: https://api.deepseek.com
           OPENAI_API_BASE: https://api.deepseek.com
           MODEL: deepseek-chat
@@ -80,43 +85,34 @@ jobs:
             echo "🟢 Manual run without PR number. Attempting to review changes against default branch..."
             DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           
-            # 临时文件用于捕获输出
             TEMP_OUTPUT=$(mktemp)
-            set +e  # 临时关闭自动退出
-            # 尝试审查差异（HEAD vs 默认分支）
+            set +e
             gito --verbose review --what HEAD --against "origin/${DEFAULT_BRANCH}" 2>&1 | tee "$TEMP_OUTPUT"
             REVIEW_EXIT_CODE=${PIPESTATUS[0]}
-            set -e  # 恢复自动退出
+            set -e
 
-            # 判断是否因“无变更”而失败
             if [ $REVIEW_EXIT_CODE -ne 0 ] || grep -q "No changes to review" "$TEMP_OUTPUT"; then
-              echo "⚠️ No changes found or diff review failed. Falling back to full codebase review..."
+              echo "⚠️ No changes found. Falling back to full codebase review..."
               gito --verbose review --all
             else
-              echo "✅ Changes found and reviewed successfully."
+              echo "✅ Changes reviewed."
             fi
             rm -f "$TEMP_OUTPUT"
-
           else
-            # PR 事件 或 手动运行但提供了 PR 编号：使用默认 review 命令
             echo "🟢 Running in PR context or with provided PR number."
             gito --verbose review
           fi
 
-          # 条件评论逻辑
+          # 条件评论
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # 手动运行：只有输入了 PR 编号且 comment 为 true 时才评论
             if [ "${{ github.event.inputs.comment }}" == "true" ] && [ -n "${{ github.event.inputs.pr_number }}" ]; then
-              echo "💬 Posting review comment to PR #${{ github.event.inputs.pr_number }}"
               gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
             fi
           else
-            # PR 事件自动触发：始终评论
-            echo "💬 Posting review comment to PR"
             gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
           fi
 
-      # 上传审查报告作为工件
+      # 上传报告
       - uses: actions/upload-artifact@v6
         with:
           name: ai-code-review-results
