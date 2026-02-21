@@ -1,0 +1,42 @@
+name: "Gito: AI Code Review"
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ] # 监听 PR 的创建和代码更新
+  issue_comment:
+    types: [ created ] # 监听评论，从而支持通过评论与 Gito 互动
+  workflow_dispatch: # 允许在 GitHub 网页端手动触发
+
+jobs:
+  review:
+    # 过滤条件：确保 Action 仅在 Pull Request 或 PR 相关的评论中运行，避免在普通 Issue 评论中浪费额度
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # Gito 必须拥有 write 权限才能把审查结果作为评论发回 PR
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Gito AI Code Reviewer
+        uses: Nayjest/Gito@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # ===============================
+          # 自定义模型核心配置区
+          # ===============================
+
+          # 绝大多数自定义的 Base URL 都兼容 OpenAI 接口规范，建议保持为 openai
+          LLM_API_TYPE: "openai"
+
+          # 引用你在第一步中设置的 GitHub Secret
+          LLM_API_KEY: ${{ secrets.CUSTOM_LLM_API_KEY }}
+
+          # 替换为你的自定义 Base URL (注意：通常需以 /v1 结尾)
+          LLM_API_BASE: "https://api.deepseek.com/v1"
+
+          # 替换为你的自定义模型名称
+          MODEL: "deepseek-reasoner"
