@@ -4,17 +4,16 @@ on:
   pull_request:
     types: [ opened, synchronize, reopened ]
   issue_comment:
-    # 允许通过评论触发（例如在 PR 评论 /review）
     types: [ created ]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "手动输入 PR 编号 (仅在手动点击时需要)"
+        description: "PR 编号（非必填，留空则仅生成本地报告）"
         required: false
 
 jobs:
   review:
-    # 过滤条件：1. PR 活动 2. 包含关键字的 PR 评论 3. 手动触发
+    # 触发条件：1. PR 活动 2. PR 评论包含 /review 3. 手动点击
     if: >
       github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
@@ -39,33 +38,44 @@ jobs:
         run: pip install gito.bot~=4.0
 
       - name: Run AI code review
+        id: run_gito
         env:
-          # 核心配置：使用 GITO_ 前缀是 Python 版最稳妥的方式
+          # 自定义模型配置
           GITO_LLM_TYPE: "openai"
           GITO_LLM_API_KEY: ${{ secrets.CUSTOM_LLM_API_KEY }}
-          GITO_LLM_API_BASE: "https://your-custom-url.com/v1" # 确保这里是你的自定义 URL
-          GITO_MODEL: "your-custom-model-name"
+          GITO_LLM_API_BASE: "https://api.deepseek.com/v1" # 记得改成你的实际地址
+          GITO_MODEL: "deepseek-reasoner"             # 记得改成你的实际模型名
 
           # GitHub 相关
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 动态获取 PR 编号
-          GITHUB_PR_NUMBER: >-
-            ${{ 
-              github.event.pull_request.number || 
-              github.event.issue.number || 
-              github.event.inputs.pr_number 
-            }}
+          # 尝试获取 PR 编号
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
         run: |
-          # 建议在运行前打印一下版本确认
-          gito --version
+          echo "Starting Gito review..."
+          # 1. 运行核心审查（无论有没有 PR 都会生成 code-review-report.md）
           gito --verbose review
-          gito github-comment
+          
+          # 2. 将审查结果直接输出到 GitHub Action 的摘要页面，方便在没有 PR 时查看
+          if [ -f code-review-report.md ]; then
+            echo "### 🤖 AI Code Review Summary" >> $GITHUB_STEP_SUMMARY
+            cat code-review-report.md >> $GITHUB_STEP_SUMMARY
+          fi
 
-      - name: Upload Results
+          # 3. 只有在 PR 环境下，才尝试发送 GitHub 评论
+          if [ ! -z "$PR_NUMBER" ]; then
+            echo "PR detected (ID: $PR_NUMBER), posting comment..."
+            # 将 PR 编号映射给 Gito 识别的环境变量
+            export GITHUB_PR_NUMBER=$PR_NUMBER
+            gito github-comment
+          else
+            echo "No PR number provided. Skipping GitHub comment."
+          fi
+
+      - name: Upload Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gito-code-review-results
+          name: gito-report
           path: |
             code-review-report.md
             code-review-report.json
