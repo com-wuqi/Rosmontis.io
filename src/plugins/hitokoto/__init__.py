@@ -1,9 +1,10 @@
-from nonebot import get_plugin_config,on_command
+from nonebot import get_plugin_config, on_command
+from nonebot import require
 from nonebot.adapters.onebot.v11 import MessageEvent, Bot, Message, GroupMessageEvent, PrivateMessageEvent
+from nonebot.log import logger
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
-from nonebot.log import logger
-from nonebot import require
+
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler
 import asyncio
@@ -59,7 +60,7 @@ async def handle_yiyan_cache():
     if _is_debug:
         logger.debug("_cache now is : {}".format(_cache))
     async with _cache_lock:
-        _new = get_a_yiyan()
+        _new = await get_a_yiyan()
         if len(_cache)<_cache_length_limit:
             _cache.append(_new)
         else:
