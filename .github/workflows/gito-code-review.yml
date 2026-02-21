@@ -3,73 +3,59 @@ name: "Gito: AI Code Review"
 on:
   pull_request:
     types: [ opened, synchronize, reopened ]
-  issue_comment:
-    types: [ created ]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR 编号"
-        required: false
+        description: "Pull Request number"
+        required: true
+      comment:
+        description: "Leave a review comment on the PR"
+        type: boolean
+        default: true
 
 jobs:
   review:
-    if: >
-      github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/review'))
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-
+      pull-requests: write   # 允许留下评论（即使不运行评论步骤，写权限仍保留）
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install AI Code Review tool
         run: pip install gito.bot~=4.0
 
-      - name: Run AI code review
+      - name: Run AI code analysis
         env:
-          # 将敏感信息映射为临时变量
-          RAW_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          # 使用 DeepSeek 官方 API（兼容 OpenAI 格式）
+          LLM_API_TYPE: openai
+          OPENAI_BASE_URL: https://api.deepseek.com
+          MODEL: "deepseek-chat"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
+          PR_NUMBER_FROM_WORKFLOW_DISPATCH: ${{ github.event.inputs.pr_number }}
         run: |
-          # 1. 创建 Gito 的配置目录
-          mkdir -p ~/.gito
-          
-          # 2. 直接向 ~/.gito/.env 写入配置 (使用 printf 确保没有多余的换行符或空格)
-          # 注意：这里我们手动把所有配置写死进去
-          printf "LLM_API_TYPE=openai\n" > ~/.gito/.env
-          printf "LLM_API_KEY=${RAW_API_KEY}\n" >> ~/.gito/.env
-          printf "LLM_API_BASE=https://api.deepseek.com/v1\n" >> ~/.gito/.env
-          printf "MODEL=deepseek-reasoner\n" >> ~/.gito/.env
-          
-          # 3. 验证文件内容（不打印 KEY 以保护隐私）
-          echo "Checking ~/.gito/.env content (names only):"
-          grep -oE '^[^=]+' ~/.gito/.env
-          
-          # 4. 执行审查
-          # 此时不带任何环境变量运行，让 gito 自己去读 ~/.gito/.env
           gito --verbose review
-          
-          # 5. 生成运行摘要
-          if [ -f code-review-report.md ]; then
-            echo "### 🤖 AI Code Review Result (DeepSeek)" >> $GITHUB_STEP_SUMMARY
-            cat code-review-report.md >> $GITHUB_STEP_SUMMARY
+          # 根据手动输入的 comment 参数决定是否添加评论
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.comment }}" == "true" ]; then
+              gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
+            fi
+          else
+            # PR 事件自动触发时始终评论（可根据需要调整）
+            gito github-comment --token ${{ secrets.GITHUB_TOKEN }}
           fi
-          
-          # 6. 如果在 PR 环境下，执行评论
-          if [ ! -z "$PR_NUMBER" ]; then
-            export GITHUB_PR_NUMBER=$PR_NUMBER
-            # 只有评论步骤需要 GITHUB_TOKEN
-            gito github-comment
-          fi
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ai-code-review-results
+          path: |
+            code-review-report.md
+            code-review-report.json
