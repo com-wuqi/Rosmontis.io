@@ -8,12 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR 编号（非必填，留空则仅生成本地报告）"
+        description: "PR 编号 (仅在没有 PR 关联时手动输入)"
         required: false
 
 jobs:
   review:
-    # 触发条件：1. PR 活动 2. PR 评论包含 /review 3. 手动点击
     if: >
       github.event_name == 'pull_request' ||
       github.event_name == 'workflow_dispatch' ||
@@ -38,44 +37,46 @@ jobs:
         run: pip install gito.bot~=4.0
 
       - name: Run AI code review
-        id: run_gito
         env:
-          # 自定义模型配置
+          # --- 核心配置：同时提供带前缀和不带前缀的变量，确保工具能认出来 ---
+          LLM_API_TYPE: "openai"
           GITO_LLM_TYPE: "openai"
-          GITO_LLM_API_KEY: ${{ secrets.CUSTOM_LLM_API_KEY }}
-          GITO_LLM_API_BASE: "https://api.deepseek.com/v1" # 记得改成你的实际地址
-          GITO_MODEL: "deepseek-reasoner"             # 记得改成你的实际模型名
 
-          # GitHub 相关
+          # 🚨 重要：请确认你在 GitHub Secrets 里存的名字到底是哪一个！
+          # 如果你存的是 LLM_API_KEY，就用 ${{ secrets.LLM_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          GITO_LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+          # 你的自定义 Base URL 和模型
+          LLM_API_BASE: "https://api.deepseek.com/v1"
+          GITO_LLM_API_BASE: "https://api.deepseek.com/v1"
+
+          MODEL: "deepseek-reasoner"
+          GITO_MODEL: "deepseek-reasoner"
+
+          # --- GitHub 相关 ---
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 尝试获取 PR 编号
+          # 自动识别 PR 编号
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || github.event.inputs.pr_number }}
+
         run: |
-          echo "Starting Gito review..."
-          # 1. 运行核心审查（无论有没有 PR 都会生成 code-review-report.md）
+          # 调试语句：检查变量是否存在（不会打印具体的 KEY，只会显示长度）
+          echo "Checking environment variables..."
+          if [ -z "$LLM_API_KEY" ]; then echo "❌ Error: LLM_API_KEY is empty! Please check GitHub Secrets."; exit 1; fi
+          
+          # 1. 运行审查
           gito --verbose review
           
-          # 2. 将审查结果直接输出到 GitHub Action 的摘要页面，方便在没有 PR 时查看
+          # 2. 生成运行摘要（在 Actions 页面直接看结果）
           if [ -f code-review-report.md ]; then
-            echo "### 🤖 AI Code Review Summary" >> $GITHUB_STEP_SUMMARY
+            echo "### 🤖 AI Code Review Result" >> $GITHUB_STEP_SUMMARY
             cat code-review-report.md >> $GITHUB_STEP_SUMMARY
           fi
 
-          # 3. 只有在 PR 环境下，才尝试发送 GitHub 评论
+          # 3. 只有在 PR 环境下才尝试发评论
           if [ ! -z "$PR_NUMBER" ]; then
-            echo "PR detected (ID: $PR_NUMBER), posting comment..."
-            # 将 PR 编号映射给 Gito 识别的环境变量
             export GITHUB_PR_NUMBER=$PR_NUMBER
             gito github-comment
           else
-            echo "No PR number provided. Skipping GitHub comment."
+            echo "No PR number detected. Skipping GitHub comment, review summary is available in Job Summary."
           fi
-
-      - name: Upload Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gito-report
-          path: |
-            code-review-report.md
-            code-review-report.json
