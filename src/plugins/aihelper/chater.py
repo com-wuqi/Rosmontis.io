@@ -6,7 +6,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Private
 from nonebot.internal.params import ArgPlainText
 
 require("nonebot_plugin_orm")
-from nonebot_plugin_orm import get_scoped_session
+from nonebot_plugin_orm import get_session, async_scoped_session
 from .aihelper_handles import *
 from . import config
 import asyncio
@@ -363,33 +363,72 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
 # 自动压缩逻辑(内存中, 缺少测试)
 @scheduler.scheduled_job("interval", seconds=60,id="auto_zip_chat_in_memory")
 async def auto_zip_chat_in_memory():
-    session = get_scoped_session()
-    session_ids = list(_ai_switch.keys())
-    for session_id in session_ids:
+    async with get_session() as session:
+        session_ids = list(_ai_switch.keys())  # 从内存中提取keys
+        for session_id in session_ids:
 
-        if _ai_switch.get(session_id, False):
-            continue
-        lock = get_session_lock(session_id)
-        try:
-            await asyncio.wait_for(lock.acquire(), timeout=0)
-        except asyncio.TimeoutError:
-            continue  # 锁被占用，跳过
-
-        row = await get_config_by_id(sid=session_id, session=session)
-        # 自动清理的token由session发起者承担, 或者是 id=1 承担
-        # 但是在群聊信息中, 这里一定会是 id=1 承担 token
-
-        try:
-            _raw_message:list = _Messages_dicts[session_id]
-            if len(_raw_message)<=row.max_length:
+            if _ai_switch.get(session_id, True):
+                # 开关状态, 不存在视为内存中无数据
                 continue
-        except KeyError:
-            continue
-        # 内存中过小或不存在的不需要压缩
+            lock = get_session_lock(session_id)
+            row = await get_config_by_id(sid=session_id, session=session)
+            # 自动清理的token由session发起者承担, 或者是 id=1 承担
+            # 但是在群聊信息中, 这里一定会是 id=1 承担 token
 
-        async with lock:
-            _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])
-            _Messages_dicts[session_id] = _return_msg
+            try:
+                _raw_message: list = _Messages_dicts[session_id]
+                if len(_raw_message) <= row.max_length:
+                    # 内存中过小或不存在的不需要压缩
+                    continue
+            except KeyError:
+                continue
 
-    await session.close()
+            try:
+                await asyncio.wait_for(lock.acquire(), timeout=0)
+            except asyncio.TimeoutError:
+                continue  # 锁被占用，跳过
 
+            try:
+                _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])
+                _Messages_dicts[session_id] = _return_msg
+            except Exception as e:
+                logger.error("Error : {}".format(e))
+            finally:
+                lock.release()  # fix 释放锁
+
+
+@scheduler.scheduled_job("interval", seconds=60, id="auto_zip_chat_in_db")
+async def auto_zip_chat_in_db():
+    async with get_session() as session:
+        session_ids = await get_all_comment_ids(session)
+        for session_id in session_ids:
+            if _ai_switch.get(session_id, False):
+                # 开关状态,
+                continue
+            lock = get_session_lock(session_id)
+            row = await get_config_by_id(sid=session_id, session=session)
+            # 但是在群聊信息中, 这里一定会是 id=1 承担 token
+            try:
+                # 锁状态
+                await asyncio.wait_for(lock.acquire(), timeout=0.1)
+            except asyncio.TimeoutError:
+                continue  # 锁被占用，跳过
+            _res = await get_comments_by_id(sid=session_id, session=session)
+
+            if _res is None or not _res.message:
+                lock.release()
+                continue
+            _msgs: list = json.loads(_res.message)
+            if len(_msgs) <= row.max_length:
+                lock.release()
+                continue
+
+            try:
+                _return_msg = await common_zip_message(row=row, _input_msg=_msgs)
+                _save = await update_comments_by_id(sid=session_id, session=session, msg=json.dumps(_return_msg))
+                if _save != 0:
+                    await zip_db_ai.send("zip_db_ai. failed")
+            except Exception as e:
+                logger.error("Error : {}".format(e))
+            finally:
+                lock.release()
