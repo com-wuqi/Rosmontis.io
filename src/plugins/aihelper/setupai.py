@@ -6,6 +6,7 @@ from nonebot.typing import T_State
 
 require("nonebot_plugin_orm")
 from .aihelper_handles import *
+from nonebot_plugin_orm import async_scoped_session
 
 _superusers = get_driver().config.selfhostaiusers
 _superusers = [int(k) for k in _superusers]

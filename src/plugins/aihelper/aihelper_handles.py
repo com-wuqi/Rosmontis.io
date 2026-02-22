@@ -9,7 +9,7 @@ from sqlalchemy import select
 from .models import *
 
 require("nonebot_plugin_orm")
-from nonebot_plugin_orm import async_scoped_session
+from nonebot_plugin_orm import AsyncSession
 from . import config
 from .tools import *
 import httpx
@@ -44,7 +44,7 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,m
         return chat_completion.choices[0].message
 
 
-async def get_config_by_id(sid: int,session: async_scoped_session):
+async def get_config_by_id(sid: int, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid, Settings.is_enabled == 1)
         result = await session.execute(smt)
@@ -63,14 +63,15 @@ async def get_config_by_id(sid: int,session: async_scoped_session):
         return row
 
 
-async def get_all_config_by_id(sid: int,session: async_scoped_session):
+async def get_all_config_by_id(sid: int, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid)
         result = await session.execute(smt)
         row = result.scalars().all()
         return row
 
-async def del_config_by_config_id_and_uid(config_id: int,uid: int,session: async_scoped_session):
+
+async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: AsyncSession):
     async with semaphore_sql:
         # 保证只能操作自己的配置
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == uid)
@@ -84,7 +85,7 @@ async def del_config_by_config_id_and_uid(config_id: int,uid: int,session: async
             return 0
 
 
-async def switch_is_enable_by_id(config_id: int, session: async_scoped_session, target: bool, user_id: int) -> int:
+async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: bool, user_id: int) -> int:
     async with semaphore_sql:
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == user_id)
         result = await session.execute(smt)
@@ -96,20 +97,23 @@ async def switch_is_enable_by_id(config_id: int, session: async_scoped_session, 
         await session.commit()
         return 0
 
-async def get_comments_by_id(sid: int,session: async_scoped_session):
+
+async def get_comments_by_id(sid: int, session: AsyncSession):
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
         raw = result.scalars().first()
         return raw
 
-async def save_comments_by_id(sid:int,session: async_scoped_session,msg:str):
+
+async def save_comments_by_id(sid: int, session: AsyncSession, msg: str):
     async with semaphore_sql:
         raw = AIHelperComments(comment_id=sid, message=msg)
         session.add(raw)
         await session.commit()
 
-async def update_comments_by_id(sid:int,session: async_scoped_session,msg:str) -> int:
+
+async def update_comments_by_id(sid: int, session: AsyncSession, msg: str) -> int:
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
@@ -121,6 +125,13 @@ async def update_comments_by_id(sid:int,session: async_scoped_session,msg:str) -
         await session.commit()
         return 0
 
+
+async def get_all_comment_ids(session: AsyncSession) -> List[int]:
+    async with semaphore_sql:
+        stmt = select(AIHelperComments.comment_id)
+        result = await session.execute(stmt)
+        id_list = list(result.scalars().all())
+        return id_list
 
 async def call_web_search(
         query: str,
