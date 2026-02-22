@@ -361,7 +361,7 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
 
 
 # 自动压缩逻辑(内存中, 缺少测试)
-@scheduler.scheduled_job("interval", seconds=60,id="auto_zip_chat_in_memory")
+@scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")
 async def auto_zip_chat_in_memory():
     async with get_session() as session:
         session_ids = list(_ai_switch.keys())  # 从内存中提取keys
@@ -397,7 +397,7 @@ async def auto_zip_chat_in_memory():
                 lock.release()  # fix 释放锁
 
 
-@scheduler.scheduled_job("interval", seconds=60, id="auto_zip_chat_in_db")
+@scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_db")
 async def auto_zip_chat_in_db():
     async with get_session() as session:
         session_ids = await get_all_comment_ids(session)
