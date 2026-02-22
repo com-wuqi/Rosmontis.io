@@ -426,9 +426,9 @@ async def auto_zip_chat_in_db():
             try:
                 _return_msg = await common_zip_message(row=row, _input_msg=_msgs)
                 _save = await update_comments_by_id(sid=session_id, session=session, msg=json.dumps(_return_msg))
+                if _save != 0:
+                    await zip_db_ai.send("zip_db_ai. failed")
             except Exception as e:
                 logger.error("Error : {}".format(e))
             finally:
                 lock.release()
-            if _save != 0:
-                await zip_db_ai.send("zip_db_ai. failed")
