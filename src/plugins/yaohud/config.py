@@ -8,6 +8,8 @@ class ScopedConfig(BaseModel):
     base_url: str
     api_key: str
     api_secret: str
+    upload_ws_url: str  # 上传 url
+    upload_ws_token: str  # token
 
 
 class Config(BaseModel):

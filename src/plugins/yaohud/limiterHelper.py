@@ -1,6 +1,14 @@
 import asyncio
 import time
 
+import httpx
+from nonebot.log import logger
+
+from . import config
+from .napcatqq_upload_stream import OneBotUploadTester as uploader
+
+semaphore_download = asyncio.Semaphore(20)
+semaphore_upload = asyncio.Semaphore(20)
 
 class TokenBucket:
     def __init__(self, rate: float, capacity: float):
@@ -27,3 +35,30 @@ class TokenBucket:
                     return
                 wait_time = (1 - self.tokens) / self.rate
                 await asyncio.sleep(wait_time)
+
+
+async def download_file(url: str, save_path: str):
+    # 下载工具类
+    _header = {"Content-Type": "application/x-www-form-urlencoded",
+               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    async with semaphore_download:
+        async with httpx.AsyncClient(headers=_header) as client:
+            async with client.stream("GET", url) as response:
+                try:
+                    response.raise_for_status()  # 检查 HTTP 错误
+                    with open(save_path, "wb") as f:
+                        async for chunk in response.aiter_bytes():
+                            f.write(chunk)
+                    return 0
+                except Exception as e:
+                    return -1
+
+
+async def upload_file(path: str) -> str:
+    async with semaphore_upload:
+        upload = uploader(ws_url=config.upload_ws_url, access_token=config.upload_ws_token)
+        await upload.connect()
+        remote_path = await upload.upload_file_stream_batch(file_path=path, chunk_size=1024)
+        await upload.disconnect()
+        logger.debug("img remote_path: {}".format(remote_path))
+        return remote_path

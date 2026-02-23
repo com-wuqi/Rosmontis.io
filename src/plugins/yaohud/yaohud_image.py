@@ -8,6 +8,9 @@ acg_adaptive = on_command("acg adaptive")
 
 @acg_adaptive.handle()
 async def acg_adaptive_handle():
-    url = await get_acg_adaptive()
-    await acg_adaptive.finish(MessageSegment.image(url))
-    pass
+    path_jpg = await get_acg_adaptive()
+
+    if path_jpg == -1:
+        await acg_adaptive.finish("failed")
+    else:
+        await acg_adaptive.finish(MessageSegment.image(path_jpg))

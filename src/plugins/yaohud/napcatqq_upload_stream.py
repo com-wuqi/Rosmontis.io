@@ -14,6 +14,8 @@ import uuid
 from pathlib import Path
 from typing import List, Optional
 
+import websockets
+
 
 class OneBotUploadTester:
     def __init__(self, ws_url: str = "ws://localhost:3001", access_token: Optional[str] = None):
@@ -27,15 +29,15 @@ class OneBotUploadTester:
         if self.access_token:
             headers["Authorization"] = f"Bearer {self.access_token}"
 
-        print(f"连接到 {self.ws_url}")
+        # print(f"连接到 {self.ws_url}")
         self.websocket = await websockets.connect(self.ws_url, additional_headers=headers)
-        print("WebSocket 连接成功")
+        # print("WebSocket 连接成功")
 
     async def disconnect(self):
         """断开 WebSocket 连接"""
         if self.websocket:
             await self.websocket.close()
-            print("WebSocket 连接已断开")
+            # print("WebSocket 连接已断开")
 
     def calculate_file_chunks(self, file_path: str, chunk_size: int = 64) -> tuple[List[bytes], str, int]:
         """
@@ -62,10 +64,10 @@ class OneBotUploadTester:
                 total_size += len(chunk)
 
         sha256_hash = hasher.hexdigest()
-        print(f"文件分析完成:")
-        print(f"  - 文件大小: {total_size} 字节")
-        print(f"  - 分片数量: {len(chunks)}")
-        print(f"  - SHA256: {sha256_hash}")
+        # print(f"文件分析完成:")
+        # print(f"  - 文件大小: {total_size} 字节")
+        # print(f"  - 分片数量: {len(chunks)}")
+        # print(f"  - SHA256: {sha256_hash}")
 
         return chunks, sha256_hash, total_size
 
@@ -80,7 +82,7 @@ class OneBotUploadTester:
             "echo": echo
         }
 
-        print(f"发送请求: {action}")
+        # print(f"发送请求: {action}")
         await self.websocket.send(json.dumps(message))
 
         # 等待响应
@@ -93,7 +95,7 @@ class OneBotUploadTester:
                 return data
             else:
                 # 可能是其他消息，继续等待
-                print(f"收到其他消息: {data}")
+                # print(f"收到其他消息: {data}")
                 continue
 
     async def upload_file_stream_batch(self, file_path: str, chunk_size: int = 64, file_retention: int = 120) -> str:
@@ -116,8 +118,8 @@ class OneBotUploadTester:
         chunks, sha256_hash, total_size = self.calculate_file_chunks(str(file_path), chunk_size)
         stream_id = str(uuid.uuid4())
 
-        print(f"\n开始上传文件: {file_path.name}")
-        print(f"流ID: {stream_id}")
+        # print(f"\n开始上传文件: {file_path.name}")
+        # print(f"流ID: {stream_id}")
 
         # 一次性发送所有分片
         total_chunks = len(chunks)
@@ -145,12 +147,12 @@ class OneBotUploadTester:
                 raise Exception(f"上传分片 {chunk_index} 失败: {response}")
 
             # 解析流响应
-            stream_data = response.get("data", {})
-            print(f"分片 {chunk_index + 1}/{total_chunks} 上传成功 "
-                  f"(接收: {stream_data.get('received_chunks', 0)}/{stream_data.get('total_chunks', 0)})")
+            # stream_data = response.get("data", {})
+            # print(f"分片 {chunk_index + 1}/{total_chunks} 上传成功 "
+            #       f"(接收: {stream_data.get('received_chunks', 0)}/{stream_data.get('total_chunks', 0)})")
 
         # 发送完成信号
-        print(f"\n所有分片发送完成，请求文件合并...")
+        # print(f"\n所有分片发送完成，请求文件合并...")
         complete_params = {
             "stream_id": stream_id,
             "is_complete": True
@@ -164,10 +166,10 @@ class OneBotUploadTester:
         result = response.get("data", {})
 
         if result.get("status") == "file_complete":
-            print(f"✅ 文件上传成功!")
-            print(f"  - 文件路径: {result.get('file_path')}")
-            print(f"  - 文件大小: {result.get('file_size')} 字节")
-            print(f"  - SHA256: {result.get('sha256')}")
+            # print(f"✅ 文件上传成功!")
+            # print(f"  - 文件路径: {result.get('file_path')}")
+            # print(f"  - 文件大小: {result.get('file_size')} 字节")
+            # print(f"  - SHA256: {result.get('sha256')}")
             return result.get('file_path')
         else:
             raise Exception(f"文件状态异常: {result}")
@@ -232,11 +234,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    # 安装依赖提示
-    try:
-        import websockets
-    except ImportError:
-        print("请先安装依赖: pip install websockets")
-        exit(1)
-    
     asyncio.run(main())
