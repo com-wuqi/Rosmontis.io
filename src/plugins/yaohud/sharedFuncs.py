@@ -51,6 +51,7 @@ async def download_file(url: str, save_path: str):
                             f.write(chunk)
                     return 0
                 except Exception as e:
+                    logger.warning(e)
                     return -1
 
 

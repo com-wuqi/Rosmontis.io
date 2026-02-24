@@ -28,5 +28,4 @@ config = _config.yaohud
 if config.is_enable:
     # 加载插件
     from .yaohud_image import *
-
-    pass
+    from .yaohud_ai import *
