@@ -30,7 +30,7 @@ def generate_signature(timestamp: int) -> str:
     return signature
 
 
-def build_headers(timestamp: int = None) -> dict:
+def build_headers(timestamp: int | None = None) -> dict:
     """
     构造包含认证信息的请求头
     :param timestamp: UNIX 时间戳（秒），若为 None 则自动获取当前时间

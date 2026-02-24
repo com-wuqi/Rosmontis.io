@@ -1,5 +1,6 @@
 import asyncio
 import time
+from json import JSONDecodeError
 
 import httpx
 from httpx import HTTPStatusError
@@ -59,5 +60,11 @@ async def get_acg(img_type: str):
                     return -1
 
             except HTTPStatusError as e:
-                logger.warning(f"api/acg/adaptive failed with {e}")
+                logger.warning(f"/api/acg/ failed with {e}")
+                return -1
+            except JSONDecodeError as e:
+                logger.warning(f"/api/acg/ failed with {e}")
+                return -1
+            except KeyError as e:
+                logger.warning(f"/api/acg/ failed with {e}")
                 return -1

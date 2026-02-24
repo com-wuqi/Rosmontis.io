@@ -30,7 +30,7 @@ async def acg_ai_handle():
 @acg_r18.handle()
 async def acg_ai_handle(event: MessageEvent):
     if isinstance(event, GroupMessageEvent):
-        await acg_ai.finish("403")
+        await acg_r18.finish("403")
     path_jpg = await get_acg("r18")
     if path_jpg == -1:
         await acg_r18.finish("failed")

@@ -1,5 +1,6 @@
 import asyncio
 import time
+from json import JSONDecodeError
 
 import httpx
 from httpx import HTTPStatusError
@@ -18,7 +19,7 @@ _semaphore_ai = asyncio.Semaphore(20)
 
 
 async def get_index_tts2(voice_txt: str, voice_from: str):
-    await _semaphore_ai.acquire()
+    await bucket_index_tts2.acquire()
     async with _semaphore_ai:
         async with httpx.AsyncClient(timeout=120) as client:
             url = config.base_url + "/api/model/index_tts2"
@@ -38,5 +39,11 @@ async def get_index_tts2(voice_txt: str, voice_from: str):
                 else:
                     return -1
             except HTTPStatusError as e:
+                logger.warning(f"/api/model/index_tts2 failed with {e}")
+                return -1
+            except JSONDecodeError as e:
+                logger.warning(f"/api/model/index_tts2 failed with {e}")
+                return -1
+            except KeyError as e:
                 logger.warning(f"/api/model/index_tts2 failed with {e}")
                 return -1
