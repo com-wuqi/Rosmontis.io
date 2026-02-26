@@ -10,6 +10,8 @@ class ScopedConfig(BaseModel):
     api_secret: str
     upload_ws_url: str  # 上传 url
     upload_ws_token: str  # token
+    wyvip_cookie: str  # 暂时不使用
+    qqmusic_cookie: str  # 暂时不使用
 
 
 class Config(BaseModel):

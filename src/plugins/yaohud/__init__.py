@@ -29,3 +29,4 @@ if config.is_enable:
     # 加载插件
     from .yaohud_image import *
     from .yaohud_ai import *
+    from .yaohud_music import *
