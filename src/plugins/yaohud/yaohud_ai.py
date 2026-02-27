@@ -2,10 +2,11 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageSegment, MessageEvent, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 
-from .yaohud_ai_handle import get_index_tts2
+from .yaohud_ai_handle import get_index_tts2, get_weijin, get_yaohu_picture
 
 index_tts2 = on_command("tts")
-
+weijin_check = on_command("weijin")
+yaohu_picture_ai = on_command("aidraw")
 
 @index_tts2.handle()
 async def index_tts2_handle(event: MessageEvent, args: Message = CommandArg()):
@@ -27,3 +28,33 @@ async def index_tts2_handle(event: MessageEvent, args: Message = CommandArg()):
     else:
         _file = MessageSegment("file", {"file": f"file://{_res}"})
         await index_tts2.finish(_file)
+
+
+@weijin_check.handle()
+async def weijin_check_handle(args: Message = CommandArg()):
+    string = args.extract_plain_text().strip()
+    if string == "" or string is None:
+        await weijin_check.finish(str(True))
+        return
+    _res = await get_weijin(txt=string)
+    if _res:
+        await weijin_check.finish(str(True))
+    else:
+        await weijin_check.finish(str(False))
+
+
+@yaohu_picture_ai.handle()
+async def yaohu_picture_ai_handle(args: Message = CommandArg()):
+    string = args.extract_plain_text().strip()
+    if string == "" or string is None:
+        await yaohu_picture_ai.finish("need txt")
+        return
+    _check = await get_weijin(txt=string)
+    if not _check:
+        await yaohu_picture_ai.finish("failed before check")
+    _res = await get_yaohu_picture(txt=string)
+    if _res == -1:
+        await yaohu_picture_ai.finish("fail")
+    else:
+        _file = MessageSegment("file", {"file": f"file://{_res}"})
+        await yaohu_picture_ai.finish(_file)

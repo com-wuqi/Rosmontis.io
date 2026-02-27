@@ -39,10 +39,17 @@ class TokenBucket:
 
 async def download_file(url: str, save_path: str):
     # 下载工具类
-    _header = {"Content-Type": "application/x-www-form-urlencoded",
-               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    _header = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1"
+    }
     async with semaphore_download:
-        async with httpx.AsyncClient(headers=_header) as client:
+        async with httpx.AsyncClient(headers=_header, http1=True) as client:
             async with client.stream("GET", url) as response:
                 try:
                     response.raise_for_status()  # 检查 HTTP 错误
