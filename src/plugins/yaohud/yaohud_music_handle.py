@@ -19,7 +19,7 @@ _bucket_netease_music = TokenBucket(rate=20, capacity=20)  #
 _semaphore_music = asyncio.Semaphore(60)
 
 
-async def get_netease_music(msg_type: str, msg: str, n: int = 1, level: str = "standard", g: int = 15):
+async def get_netease_music(msg_type: str, msg: str, n: int = 1, level: str = config.wyvip_level, g: int = 15):
     """
         netease_music音乐接口
     :param msg_type: 类型, "search" or "get"
