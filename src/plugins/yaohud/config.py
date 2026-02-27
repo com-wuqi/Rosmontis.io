@@ -13,7 +13,8 @@ class ScopedConfig(BaseModel):
     wyvip_cookie: str  # 暂时不使用
     wyvip_level: str  # 音质 , 参考 get_netease_music()
     qqmusic_cookie: str  # 暂时不使用
-    qqmusic_level: str  # size 定义歌曲音质，当type=url时有效，留空默认m4a试听音质，可选参数：mp3:普通音质、hq:高品质、sq:无损、hires:HiRes音质
+    qqmusic_level: str  # mp3 : 普通音质、hq : 高品质、flac : 无损
+
 
 class Config(BaseModel):
     """插件主配置，包含作用域"""
