@@ -75,12 +75,12 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
                 else:
                     return -1
             except HTTPStatusError as e:
-                logger.warning(f"/api/music/wyvip failed with {e}")
+                logger.warning(f"get_common_music failed with {e}")
                 return -1
             except JSONDecodeError as e:
-                logger.warning(f"/api/music/wyvip failed with {e}")
+                logger.warning(f"get_common_music failed with {e}")
                 return -1
             except KeyError as e:
-                logger.warning(f"/api/music/wyvip failed with {e}")
+                logger.warning(f"get_common_music failed with {e}")
                 return -1
 

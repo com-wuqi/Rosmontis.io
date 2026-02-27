@@ -10,9 +10,9 @@ class ScopedConfig(BaseModel):
     api_secret: str
     upload_ws_url: str  # 上传 url
     upload_ws_token: str  # token
-    wyvip_cookie: str  # 暂时不使用
+    wyvip_cookie: str = ""  # 暂时不使用
     wyvip_level: str  # 音质 , 参考 get_netease_music()
-    qqmusic_cookie: str  # 暂时不使用
+    qqmusic_cookie: str = ""  # 暂时不使用
     qqmusic_level: str  # mp3 : 普通音质、hq : 高品质、flac : 无损
 
 
