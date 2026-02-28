@@ -16,6 +16,7 @@ import nonebot_plugin_localstore as store
 
 _bucket_netease_music = TokenBucket(rate=20, capacity=20)  #
 _bucket_qq_music = TokenBucket(rate=20, capacity=20)
+_bucket_kuwo_music = TokenBucket(rate=20, capacity=20)
 
 _semaphore_music = asyncio.Semaphore(60)
 
@@ -23,12 +24,10 @@ _semaphore_music = asyncio.Semaphore(60)
 async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g: int = 15):
     """
         通用音乐接口
-    :param api_type: 接口类型, 支持 "wyvip" "qq_plus"
+    :param api_type: 接口类型, 支持 "wyvip" "qq_plus" "kuwo"
     :param msg_type: 类型, "search" or "get"
     :param msg: 搜索内容, 必须
     :param n: 选择的序号, 仅当 msg_type = "get" 时候生效
-    standard：标准音质 | exhigh：极高音质
-    lossless 无损音质 | hires Hi-Res音质 | jyeffect 高清环绕声 | sky：沉浸环绕声 | jymaster：超清母带
     :param g: 搜索结果数量
     :return: str | Path
     """
@@ -46,6 +45,13 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
             body["n"] = n
         await _bucket_qq_music.acquire()
 
+    elif api_type == "kuwo":
+        url = config.base_url + "/api/music/kuwo"
+        body = {"key": config.api_key, "msg": msg, "size": config.kuwo_size}
+        if msg_type == "get":
+            body["n"] = n
+        await _bucket_kuwo_music.acquire()
+
     else:
         return -1
 
@@ -62,15 +68,20 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
 
                 if api_type == "wyvip":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
-                    mp3_music = store.get_plugin_cache_file(f"wyvip-{data_json["data"]["name"]}-{time.time()}.mp3")
+                    _music = store.get_plugin_cache_file(f"wyvip-{data_json["data"]["name"]}-{time.time()}.mp3")
                 elif api_type == "qq_plus":
                     music_url: str = data_json["data"]["music_url"]["url"]
-                    mp3_music = store.get_plugin_cache_file(f"qq_plus-{data_json["data"]["name"]}-{time.time()}.mp3")
+                    _music = store.get_plugin_cache_file(f"qq_plus-{data_json["data"]["name"]}-{time.time()}.mp3")
+                elif api_type == "kuwo":
+                    music_url: str = data_json["data"]["vipmusic"]["url"]
+                    _music = store.get_plugin_cache_file(f"kuwo-{data_json["data"]["name"]}-{time.time()}.mp3")
 
-                _res = await download_file(url=music_url, save_path=str(mp3_music))
+                logger.debug(f"music url: {music_url}")
+
+                _res = await download_file(url=music_url, save_path=str(_music))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(mp3_music))
-                    mp3_music.unlink()  # 删除文件
+                    _remote_path = await upload_file(path=str(_music))
+                    _music.unlink()  # 删除文件
                     return _remote_path  # 返回远程地址
                 else:
                     return -1

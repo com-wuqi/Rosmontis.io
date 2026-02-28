@@ -6,18 +6,21 @@ from .yaohud_music_handle import get_common_music
 
 netease_music = on_command("163mu")
 qq_music = on_command("qqmu")
-
+kuwo_music = on_command("kuwo")
 
 # 用法 163mu|qqmu [搜索名称] [选择的id | null]
 
 @netease_music.handle()
 @qq_music.handle()
+@kuwo_music.handle()
 async def common_music_handle(cmd: tuple[str, ...] = Command(), args: Message = CommandArg()):
     cmd_name = cmd[0]
     if cmd_name == "163mu":
         api_type = "wyvip"
     elif cmd_name == "qqmu":
         api_type = "qq_plus"
+    elif cmd_name == "kuwo":
+        api_type = "kuwo"
     else:
         return
 
