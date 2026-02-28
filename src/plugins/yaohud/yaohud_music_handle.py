@@ -19,7 +19,15 @@ _bucket_qq_music = TokenBucket(rate=20, capacity=20)
 _bucket_kuwo_music = TokenBucket(rate=20, capacity=20)
 
 _semaphore_music = asyncio.Semaphore(60)
+_file_extension: dict = {
+    "wyvip": {"standard": "mp3", "exhigh": "mp3", "lossless": "flac", "jyeffect": "flac", "sky": "flac",
+              "jymaster": "flac"},
+    "qq_plus": {"mp3": "mp3", "hq": "mp3", "flac": "flac"},
+    "kuwo": {"Standard": "mp3", "exhigh": "mp3", "SQ": "mp3", "lossless": "flac", "hires": "flac"}
+}
 
+
+# 缺少测试, 仅仅作为简单映射, 和上游以及音源相关
 
 async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g: int = 15):
     """
@@ -62,19 +70,22 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
                 response = await client.get(url, headers=headers, params=body)
                 response.raise_for_status()
                 data_json = response.json()
-                # logger.debug(data_json)
+                logger.debug(data_json)
                 if msg_type == "search":
                     return data_json["data"]["simplify"]
 
                 if api_type == "wyvip":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
-                    _music = store.get_plugin_cache_file(f"wyvip-{data_json["data"]["name"]}-{time.time()}.mp3")
+                    _file_name = f"wyvip-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.wyvip_level]}"
+                    _music = store.get_plugin_cache_file(_file_name)
                 elif api_type == "qq_plus":
                     music_url: str = data_json["data"]["music_url"]["url"]
-                    _music = store.get_plugin_cache_file(f"qq_plus-{data_json["data"]["name"]}-{time.time()}.mp3")
+                    _file_name = f"qq_plus-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.qqmusic_level]}"
+                    _music = store.get_plugin_cache_file(_file_name)
                 elif api_type == "kuwo":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
-                    _music = store.get_plugin_cache_file(f"kuwo-{data_json["data"]["name"]}-{time.time()}.mp3")
+                    _file_name = f"kuwo-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.kuwo_size]}"
+                    _music = store.get_plugin_cache_file(_file_name)
 
                 logger.debug(f"music url: {music_url}")
 

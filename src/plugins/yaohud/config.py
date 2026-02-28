@@ -14,8 +14,10 @@ class ScopedConfig(BaseModel):
     wyvip_level: str
     # standard：标准音质 | exhigh：极高音质 |lossless 无损音质 | hires Hi-Res音质 | jyeffect 高清环绕声 | sky：沉浸环绕声 | jymaster：超清母带
     qqmusic_cookie: str = ""  # 暂时不使用
-    qqmusic_level: str  # mp3 : 普通音质、hq : 高品质、flac : 无损
-    kuwo_size: str  # standard：标准音质 exhigh：极高音质 SQ：超高品质 lossless：无损音质 hires：高解析无损
+    qqmusic_level: str
+    # mp3 : 普通音质、hq : 高品质、flac : 无损
+    kuwo_size: str
+    # Standard 标准音质, exhigh 极高音质,SQ 超高品质,lossless 无损音质,hires 高解析无损
 
 
 class Config(BaseModel):
