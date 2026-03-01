@@ -31,7 +31,7 @@ async def request_help_handle(args: Message = CommandArg()):
     ai cf delete -- 删除用户配置(暂时不实现)
     ai cf edit -- 编辑用户配置
     ai cf switch -- 切换用户配置
-    ai load
+    ai load -- 
     ai save
     ai remove
     ai zp mm
