@@ -174,7 +174,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            await stop_ai.finish("主人拜拜喵~")
+            await stop_ai.finish("主人拜拜啦喵~")
         if len(_Messages_dicts[session_id])>=0:
             #
             if raw is not None:
@@ -189,7 +189,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         else:
             pass
 
-    await stop_ai.finish("主人拜拜喵~")
+    await stop_ai.finish("主人拜拜啦喵~")
 
 
 @ai_chat.handle()
