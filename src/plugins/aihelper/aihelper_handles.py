@@ -54,7 +54,7 @@ async def get_config_by_id(sid: int, session: AsyncSession):
         row = result.scalars().first()
         # 一般就提取第一个配置文件
         if row is None:
-            logger.warning("confifg not found, use default config")
+            logger.warning("config not found, use default config : 当前配置未找到，使用默认配置")
             smt_default = select(Settings).where(Settings.id == 1)
             result_default = await session.execute(smt_default)
             row_default = result_default.scalars().first()

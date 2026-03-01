@@ -24,6 +24,19 @@ request_help = on_command("get-help")
 async def request_help_handle(args: Message = CommandArg()):
     # 帮助
     _string = """
+    ai cm bk -- 备份历史对话信息
+    ai cm rt -- 还原历史对话信息(仅管理员可用)
+    ai cf add -- 增加配置文件
+    ai cf show -- 列出用户配置
+    ai cf delete -- 删除用户配置(暂时不实现)
+    ai cf edit -- 编辑用户配置
+    ai cf switch -- 切换用户配置
+    ai load
+    ai save
+    ai remove
+    ai zp mm
+    ai zp db
+    yiyan -- 输出一条一言(不是遗言！)
     """
     _help_docs = {}
     # "命令"-"帮助" 对应
