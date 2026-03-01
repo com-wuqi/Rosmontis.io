@@ -69,6 +69,8 @@ async def download_file(url: str, save_path: str):
 
 
 async def upload_file(path: str) -> str:
+    if not config.is_enable_upload:
+        return path
     async with semaphore_upload:
         upload = uploader(ws_url=config.upload_ws_url, access_token=config.upload_ws_token)
         await upload.connect()

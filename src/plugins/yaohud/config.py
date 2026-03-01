@@ -8,6 +8,7 @@ class ScopedConfig(BaseModel):
     base_url: str
     api_key: str
     api_secret: str
+    is_enable_upload: bool
     upload_ws_url: str  # 上传 url
     upload_ws_token: str  # token
     wyvip_cookie: str = ""  # 暂时不使用
