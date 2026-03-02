@@ -4,7 +4,7 @@
 
 ## 已经实现
 
-待施工
+文档 [__init__.py](src/plugins/easyhelper/__init__.py)
 
 ## 快速开始
 
