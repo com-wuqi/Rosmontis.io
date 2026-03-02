@@ -42,9 +42,9 @@ async def request_help_handle(args: Message = CommandArg()):
     acg adaptive -- 生成一张非AI二次元人物图片
     acg ai -- 绘制一张AI二次元人物图片
     acg r18 -- 黄金肾斗士专享哦
-    163mu -- 播放音乐(网易云音乐)
-    qqmu -- 播放音乐(QQ音乐)
-    kuwo -- 播放音乐(酷我音乐)
+    163mu -- 下载音乐(网易云音乐)
+    qqmu -- 下载音乐(QQ音乐)
+    kuwo -- 下载音乐(酷我音乐)
     """
     _help_docs = {
         "ai":"ai cm bk:备份历史对话信息\n"
@@ -65,9 +65,9 @@ async def request_help_handle(args: Message = CommandArg()):
         "acg adaptive":"生成一张非AI二次元人物图片",
         "acg ai":"绘制一张AI二次元人物图片",
         "acg r18":"黄金肾斗士专享哦",
-        "163mu":"用法:163mu [搜索名称] [选择的id | null],播放音乐(网易云音乐)",
-        "qqmu":"用法:qqmu [搜索名称] [选择的id | null],播放音乐(QQ音乐)",
-        "kuwo":"用法:kuwo [搜索名称] [选择的id | null],播放音乐(酷我音乐)",
+        "163mu":"用法:163mu [搜索名称] [选择的id | null],下载音乐(网易云音乐)",
+        "qqmu":"用法:qqmu [搜索名称] [选择的id | null],下载音乐(QQ音乐)",
+        "kuwo":"用法:kuwo [搜索名称] [选择的id | null],下载音乐(酷我音乐)",
     }
     # "命令"-"帮助" 对应
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:
