@@ -36,7 +36,7 @@ async def request_help_handle(args: Message = CommandArg()):
     ai remove -- 删除历史记忆
     ai zp mm -- 压缩内存中缓存的对话
     ai zp db -- 压缩服务器中缓存的对话
-    yiyan -- 输出一条一言(不是遗言！)
+    yiyan -- 输出一条一言(不是遗言)
     """
     _help_docs = {
         "ai cm bk":"备份历史对话信息",
