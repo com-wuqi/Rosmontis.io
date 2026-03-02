@@ -41,7 +41,7 @@ async def request_help_handle(args: Message = CommandArg()):
     aidraw -- 文生图
     acg adaptive -- 生成一张非AI二次元人物图片
     acg ai -- 绘制一张AI二次元人物图片
-    acg r18 -- 黄金肾斗士专享
+    acg r18 -- 黄金肾斗士专享哦
     163mu -- 播放音乐(网易云音乐)
     qqmu -- 播放音乐(QQ音乐)
     kuwo -- 播放音乐(酷我音乐)
@@ -64,7 +64,7 @@ async def request_help_handle(args: Message = CommandArg()):
         "aidraw":"文生图",
         "acg adaptive":"生成一张非AI二次元人物图片",
         "acg ai":"绘制一张AI二次元人物图片",
-        "acg r18":"黄金肾斗士专享",
+        "acg r18":"黄金肾斗士专享哦",
         "163mu":"用法:163 [搜索名称] [选择的id | null],播放音乐(网易云音乐)",
         "qqmu":"用法:qqmu [搜索名称] [选择的id | null],播放音乐(QQ音乐)",
         "kuwo":"用法:kuwo [搜索名称] [选择的id | null],播放音乐(酷我音乐)",
