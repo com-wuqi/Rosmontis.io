@@ -310,12 +310,12 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再压缩")
+            await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后运行指令 ai load 再次运行指令 ai save 最后再压缩")
 
         # 只要正常加载, 都会至少有一条system对话, 不需要其他异常处理
         if session_type == "GroupMessageEvent" and (event.sender.role != "admin" and event.sender.role != "owner"):
             # 权限不足
-            await zip_memory_ai.finish("sorry, you are not admin or owner")
+            await zip_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
 
         # 执行
         _return_msg = await common_zip_message(row=row,_input_msg=_Messages_dicts[session_id])
