@@ -13,7 +13,7 @@ from nonebot_plugin_orm import async_scoped_session
 
 # 设计上, 每个人的私聊都是保存自己的对话
 # 群里只要能够发送信息的人, 都可以保存
-# 群聊只有管理员可以还愿信息
+# 群聊只有管理员可以还原信息
 # 配置文件不可以备份和还原
 
 backup_comments = on_command("ai cm bk")  # 备份

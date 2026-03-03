@@ -15,7 +15,7 @@ from nonebot_plugin_apscheduler import scheduler
 
 _Messages_dicts = {}
 # 这里应该是 {comments_id : Messages} 这里的id用于区分不同用户
-# 这个池子存储所以用户的所以对话信息
+# 这个池子存储所有用户的所有对话信息
 _ai_switch = {}
 # 记录开关状态, 群id 或者 用户id 是index
 _config_settings = {}
@@ -48,7 +48,7 @@ def get_comments_id(event:MessageEvent):
     elif isinstance(event,PrivateMessageEvent):
         return event.user_id,"PrivateMessageEvent"
     else:
-        logger.error("fail to get comments type")
+        logger.error("fail to get comments type : 信息类型获取失败")
         return event.user_id,"unknown"
 
 def generate_zip_message(raw_message:list):
@@ -161,7 +161,7 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
             _raw_message.append({"role": "system", "content": f"{_config_settings[session_id].system}"})
 
         # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
-    await start_ai.finish("收到喵~ 会话建立")
+    await start_ai.finish("收到喵~ 主人我们来聊天喵~")
 
 @stop_ai.handle()
 async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
@@ -174,14 +174,14 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            await stop_ai.finish("会话结束~ 再见喵~")
+            await stop_ai.finish("主人拜拜啦喵~")
         if len(_Messages_dicts[session_id])>=0:
             #
             if raw is not None:
                 # 存在记录
                 res = await update_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
                 if res == -1:
-                    logger.error("fail to update comments")
+                    logger.error("fail to update comments : 信息更新失败")
             else:
                 # 不存在记录
                 _ = await save_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
@@ -189,7 +189,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         else:
             pass
 
-    await stop_ai.finish("会话结束~ 再见喵~")
+    await stop_ai.finish("主人拜拜啦喵~")
 
 
 @ai_chat.handle()
@@ -295,7 +295,7 @@ async def remove_memory_ai_handle(event: MessageEvent):
             if event.sender.role == "admin" or event.sender.role == "owner":
                 _Messages_dicts[session_id] = []
             else:
-                await remove_memory_ai.finish("sorry, you are not admin or owner")
+                await remove_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
         else:
             _Messages_dicts[session_id] = []
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
@@ -310,12 +310,12 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再压缩")
+            await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后运行指令 ai load 再次运行指令 ai save 最后再压缩")
 
         # 只要正常加载, 都会至少有一条system对话, 不需要其他异常处理
         if session_type == "GroupMessageEvent" and (event.sender.role != "admin" and event.sender.role != "owner"):
             # 权限不足
-            await zip_memory_ai.finish("sorry, you are not admin or owner")
+            await zip_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
 
         # 执行
         _return_msg = await common_zip_message(row=row,_input_msg=_Messages_dicts[session_id])

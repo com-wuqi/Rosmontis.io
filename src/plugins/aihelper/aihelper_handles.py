@@ -34,11 +34,14 @@ async def get_model_names(key:str,url:str) -> List[str]:
 
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
+        tools = []
+        if config.is_enable_websearch:
+            tools.append(WEB_SEARCH_TOOL)
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
-            tools=[WEB_SEARCH_TOOL],
+            tools=tools or None,
             temperature=temperature
         )
         return chat_completion.choices[0].message
@@ -51,7 +54,7 @@ async def get_config_by_id(sid: int, session: AsyncSession):
         row = result.scalars().first()
         # 一般就提取第一个配置文件
         if row is None:
-            logger.warning("confifg not found, use default config")
+            logger.warning("config not found, use default config : 当前配置未找到，使用默认配置")
             smt_default = select(Settings).where(Settings.id == 1)
             result_default = await session.execute(smt_default)
             row_default = result_default.scalars().first()

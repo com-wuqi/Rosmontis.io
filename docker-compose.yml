@@ -1,0 +1,95 @@
+# Rosmontis.io Docker Compose 配置
+version: '3.8'
+
+
+services:
+  # 机器人服务
+  rosbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # image: ${IMAGE:-ghcr.io/com-wuqi/rosmontis.io:latest}
+    container_name: rosbot
+    restart: unless-stopped
+    environment:
+      # 从 .env.prod 加载，这里可以覆盖
+      - SQLALCHEMY_DATABASE_URL=mysql+aiomysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data
+      - ONEBOT_WS_URLS=["ws://napcat:3001/onebot/v11/ws"]
+      - ONEBOT_ACCESS_TOKEN=${ONEBOT_ACCESS_TOKEN}
+      - YAOHUD__UPLOAD_WS_URL=ws://napcat:3001
+      - YAOHUD__UPLOAD_WS_TOKEN=${YAOHUD__UPLOAD_WS_TOKEN}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - AIHELPER__WEBSEARCH_API_KEY=${AIHELPER__WEBSEARCH_API_KEY:-}
+      - YAOHUD__API_KEY=${YAOHUD__API_KEY:-}
+      - YAOHUD__API_SECRET=${YAOHUD__API_SECRET:-}
+    volumes:
+      # 持久化插件数据
+      - rosbot_data:/app/data
+      # 挂载环境配置文件（可选）
+      - ./.env.prod:/app/.env.prod:ro
+      # 挂载自定义插件（可选）
+      - ./src/plugins:/app/src/plugins:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - rosbot-network
+
+
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: rosbot-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=data
+      - MYSQL_USER=rosbot
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - rosbot-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  napcat:
+    image: mlikiowa/napcat-docker:latest
+    container_name: napcat
+    restart: unless-stopped
+    environment:
+      # 容器内运行的用户 ID，通常保持 0（root）避免权限问题
+      - NAPCAT_UID=${NAPCAT_UID:-0}
+      - NAPCAT_GID=${NAPCAT_GID:-0}
+      # 【必填】机器人的 QQ 账号
+      - ACCOUNT=${DOCKER_QQ_ACCOUNT:-1}
+      # 可选：设置 WebUI 的访问令牌，如果不设置，系统会随机生成一个并在日志中打印
+      - WEBUI_TOKEN=${NAPWEBUI_TOKEN:-}
+    ports:
+      # NapCat 管理面板端口 (WebUI)，通过此端口扫码登录和配置
+      - "6099:6099"
+      # 正向 WebSocket 服务端口，映射到宿主机便于调试（可选，rosbot 通过内部网络访问不需要映射）
+      - "3001:3001"
+    volumes:
+      - ./napcat_config:/app/napcat/config
+      - ./napcat_qq_data:/app/.config/QQ
+      - ./napcat_logs:/app/napcat/logs
+    networks:
+      - rosbot-network
+
+networks:
+  rosbot-network:
+    driver: bridge
+
+volumes:
+  rosbot_data:
+    driver: local
+  mysql_data:
+    driver: local
