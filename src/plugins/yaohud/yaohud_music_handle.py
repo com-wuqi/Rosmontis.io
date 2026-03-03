@@ -14,9 +14,10 @@ from .signHelper import build_headers
 require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
-_bucket_netease_music = TokenBucket(rate=20, capacity=20)  #
+_bucket_netease_music = TokenBucket(rate=20, capacity=20)
 _bucket_qq_music = TokenBucket(rate=20, capacity=20)
-_bucket_kuwo_music = TokenBucket(rate=20, capacity=20)
+_bucket_kuwo_music = TokenBucket(rate=2, capacity=20)
+_bucket_apple_music = TokenBucket(rate=15 / 20, capacity=15)
 
 _semaphore_music = asyncio.Semaphore(60)
 _file_extension: dict = {
@@ -32,7 +33,7 @@ _file_extension: dict = {
 async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g: int = 15):
     """
         通用音乐接口
-    :param api_type: 接口类型, 支持 "wyvip" "qq_plus" "kuwo"
+    :param api_type: 接口类型, 支持 "wyvip" "qq_plus" "kuwo" "applemu"
     :param msg_type: 类型, "search" or "get"
     :param msg: 搜索内容, 必须
     :param n: 选择的序号, 仅当 msg_type = "get" 时候生效
@@ -60,6 +61,13 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
             body["n"] = n
         await _bucket_kuwo_music.acquire()
 
+    elif api_type == "applemu":
+        url = config.base_url + "/api/music/apple"
+        body = {"key": config.api_key, "msg": msg}
+        if msg_type == "get":
+            body["n"] = n
+        await _bucket_apple_music.acquire()
+
     else:
         return -1
 
@@ -85,6 +93,10 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
                 elif api_type == "kuwo":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
                     _file_name = f"kuwo-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.kuwo_size]}"
+                    _music = store.get_plugin_cache_file(_file_name)
+                elif api_type == "applemu":
+                    music_url: str = data_json["data"]["url"]
+                    _file_name = f"apple_music-{data_json["data"]["trackName"]}-{time.time()}.ogg"
                     _music = store.get_plugin_cache_file(_file_name)
 
                 logger.debug(f"music url: {music_url}")

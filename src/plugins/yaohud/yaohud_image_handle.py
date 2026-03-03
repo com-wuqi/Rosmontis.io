@@ -16,7 +16,7 @@ import nonebot_plugin_localstore as store
 
 _bucket_acg_adaptive = TokenBucket(rate=15, capacity=15)
 _bucket_acg_ai = TokenBucket(rate=15, capacity=15)
-_bucket_acg_r18 = TokenBucket(rate=100, capacity=100)
+_bucket_acg_r18 = TokenBucket(rate=20, capacity=20)
 _semaphore_image = asyncio.Semaphore(60)
 
 

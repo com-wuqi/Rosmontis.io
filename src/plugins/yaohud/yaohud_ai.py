@@ -12,9 +12,6 @@ yaohu_picture_ai = on_command("aidraw")
 async def index_tts2_handle(event: MessageEvent, args: Message = CommandArg()):
     """
     IndexTTS2-语音合成 , 当前支持角色, 英文支持不行
-    原神: 希格雯/神里绫华/胡桃/可莉/芙宁娜
-    星穹铁道: 阮梅
-    明日方舟: 多萝西
     用法  [角色] [内容]
     """
     if isinstance(event, GroupMessageEvent):

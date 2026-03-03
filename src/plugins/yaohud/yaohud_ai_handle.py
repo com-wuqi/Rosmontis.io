@@ -14,8 +14,8 @@ from .signHelper import build_headers
 require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
-bucket_index_tts2 = TokenBucket(rate=1 / 20, capacity=1)
-bucket_yaohu_picture = TokenBucket(rate=1 / 40, capacity=1)
+bucket_index_tts2 = TokenBucket(rate=20, capacity=20)
+bucket_yaohu_picture = TokenBucket(rate=20, capacity=20)
 bucket_weijin = TokenBucket(rate=20, capacity=20)  # 高性能违禁词检验
 _semaphore_ai = asyncio.Semaphore(60)
 
