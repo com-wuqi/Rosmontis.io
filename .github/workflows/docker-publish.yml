@@ -1,0 +1,74 @@
+name: Docker Build and Push
+
+on:
+  # 1. 自动触发：当代码合并(push)到 release 分支时
+  push:
+    branches:
+      - 'release'
+
+  # 2. 手动触发：用于调试或特殊版本发布
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: '自定义镜像标签 (留空则使用默认策略)'
+        required: false
+        default: ''
+      platforms:
+        description: '目标架构'
+        required: true
+        default: 'linux/amd64,linux/arm64'
+
+# 权限设置
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 动态生成标签策略
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # 标签策略逻辑
+          tags: |
+            # 如果是手动触发且输入了 tags，使用输入的 tags
+            type=raw,value=${{ inputs.tags }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tags != '' }}
+            # 如果是自动触发 (push 到 release 分支)，使用分支名作为标签 (例如：release)
+            type=ref,event=branch,enable=${{ github.event_name == 'push' }}
+            # 始终附加 commit sha 短哈希，方便追溯 (例如：sha-a1b2c3d)
+            type=sha,prefix=sha-,format=short,enable=${{ github.event_name == 'push' }}
+            # 如果是手动触发且没输入 tags，默认为 manual-<timestamp> 或 latest
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && inputs.tags == '' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 多架构支持
+          platforms: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

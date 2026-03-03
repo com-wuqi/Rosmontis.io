@@ -48,7 +48,9 @@ nb orm upgrade # 一般用不上, 数据库更新之后需要
 
 然后就能用了, 还有问题可提 issue
 
-## docker (linux only)
+## docker 手动构建
+
+克隆仓库, 进入目录,
 
 适当修改 `.env.prod`, 然后
 
@@ -59,7 +61,15 @@ sudo docker logs -f napcat
 ```
 手动登录, 然后进入webui(token在上面)(一般是 http://127.0.0.1:6099), 添加 网络配置
 
-类型是ws服务器, 名称随意, Host: 0.0.0.0 ,Port: 3001 ,选择启用 , token: 和 .env.prod 的ONEBOT_ACCESS_TOKEN和YAOHUD__UPLOAD_WS_TOKEN相同
+类型是ws服务器, 名称随意,
+
+Host: 0.0.0.0 ,
+
+Port: 3001 ,
+
+选择启用 ,
+
+token: 和 .env.prod 的ONEBOT_ACCESS_TOKEN和YAOHUD__UPLOAD_WS_TOKEN相同
 
 ```bash
 sudo docker logs -f rosbot # 检查是否连接成功
