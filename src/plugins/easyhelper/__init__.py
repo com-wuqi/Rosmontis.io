@@ -67,6 +67,7 @@ async def request_help_handle(args: Message = CommandArg()):
     """,
         "other": """
     yiyan -- 输出一条一言(不是遗言)
+    whois [url] -- 查询 whois 信息
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

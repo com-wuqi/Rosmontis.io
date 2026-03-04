@@ -17,7 +17,7 @@ import nonebot_plugin_localstore as store
 bucket_index_tts2 = TokenBucket(rate=20, capacity=20)
 bucket_yaohu_picture = TokenBucket(rate=20, capacity=20)
 bucket_weijin = TokenBucket(rate=20, capacity=20)  # 高性能违禁词检验
-_semaphore_ai = asyncio.Semaphore(60)
+_semaphore_ai = asyncio.Semaphore(30)
 
 
 async def get_index_tts2(voice_txt: str, voice_from: str):
