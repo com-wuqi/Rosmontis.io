@@ -6,6 +6,7 @@ class ScopedConfig(BaseModel):
     is_enable: bool
     tools_max_once_calls: int
     is_enable_websearch: bool
+    is_enable_e2b_sandbox: bool
 
 
 class Config(BaseModel):
