@@ -237,11 +237,12 @@ async def ai_chat_handle(event: MessageEvent):
                 messages=_raw_message,
                 temperature=_event_setting.temperature
             )
-            # 此处, ai可能尝试了调用工具
+            # 此处, ai可能没有尝试调用工具
             if not _res.tool_calls:
                 _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
                 break
 
+            # 保存 工具调用请求的上下文
             _assistant_message = {
                 "role": "assistant",
                 "content": _res.content,  # 可能为 None，保留即可
@@ -259,12 +260,24 @@ async def ai_chat_handle(event: MessageEvent):
             }
             _raw_message.append(_assistant_message)
             for tool_call in _res.tool_calls:
-                # 保存 工具调用请求的上下文
+                # 处理所有工具调用
+                if tool_call.function.name == "get_current_time":
+                    _result = agents.get_current_time()
+                    logger.debug(f"called get_current_time: {_result}")
+                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
+
                 if tool_call.function.name == "web_search":
-                    # 处理工具
+                    # 处理工具 web_search
                     _searched = await agents.handle_web_search(tool_call=tool_call)
                     logger.debug(f"called web_search")
                     _raw_message.append({"tool_call_id": tool_call.id,"role": "tool","content": str(_searched)})
+
+                if tool_call.function.name == "e2b_code":
+                    # 处理工具 e2b
+                    _result = await agents.handle_e2b_sandbox(tool_call=tool_call)
+                    logger.debug(f"called e2b_code")
+                    logger.debug(f"e2b_code raw: {_result}")
+                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
 
                 else:
                     pass
