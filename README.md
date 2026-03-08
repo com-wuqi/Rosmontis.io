@@ -69,7 +69,7 @@ Port: 3001 ,
 
 选择启用 ,
 
-token: 和 .env.prod 的ONEBOT_ACCESS_TOKEN和YAOHUD__UPLOAD_WS_TOKEN相同
+token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
 
 ```bash
 sudo docker logs -f rosbot # 检查是否连接成功
