@@ -35,12 +35,9 @@ async def get_model_names(key:str,url:str) -> List[str]:
 
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
-        tools = [agents.get_dict_by_name(name="GET_TIME_TOOL"), ]
+        tools = []
         if config.is_enable_websearch:
             tools.append(agents.get_dict_by_name(name="WEB_SEARCH_TOOL"))
-        if config.is_enable_e2b_sandbox:
-            tools.append(agents.get_dict_by_name(name="E2B_SANDBOX_TOOL"))
-
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
         chat_completion = await client.chat.completions.create(
             model=model_name,

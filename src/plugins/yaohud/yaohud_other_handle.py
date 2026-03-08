@@ -12,13 +12,12 @@ from .signHelper import build_headers
 
 require("nonebot_plugin_localstore")
 
-_bucket_whois = TokenBucket(rate=2 / 5, capacity=5)
-_bucket_today = TokenBucket(rate=10, capacity=10)
+bucket_whois = TokenBucket(rate=2 / 5, capacity=5)
 _semaphore_other = asyncio.Semaphore(30)
 
 
 async def whois(url: str):
-    await _bucket_whois.acquire()
+    await bucket_whois.acquire()
     async with _semaphore_other:
         async with httpx.AsyncClient(timeout=120) as client:
             api_url = config.base_url + "/api/v5/whois"
@@ -43,31 +42,4 @@ async def whois(url: str):
                 return -1
             except Exception as e:
                 logger.warning(f"/api/v5/whois failed with {e}")
-                return -1
-
-
-async def today():
-    await _bucket_today.acquire()
-    async with _semaphore_other:
-        async with httpx.AsyncClient(timeout=120) as client:
-            api_url = config.base_url + "/api/v6/lishi"
-            headers = build_headers()
-            body = {"key": config.api_key}
-            try:
-                response = await client.get(url=api_url, headers=headers, params=body)
-                response.raise_for_status()
-                data_json = response.json()
-                return "\n".join(data_json["msg"]["content"])
-
-            except HTTPStatusError as e:
-                logger.warning(f"/api/v6/lishi failed with {e}")
-                return -1
-            except JSONDecodeError as e:
-                logger.warning(f"/api/v6/lishi failed with {e}")
-                return -1
-            except KeyError as e:
-                logger.warning(f"/api/v6/lishi failed with {e}")
-                return -1
-            except Exception as e:
-                logger.warning(f"/api/v6/lishi failed with {e}")
                 return -1

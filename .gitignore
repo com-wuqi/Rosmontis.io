@@ -142,4 +142,3 @@ dmypy.json
 
 apitests/*
 *testapi*
-jobs.sqlite

@@ -28,4 +28,3 @@ typer-slim==0.20.0
 watchfiles==1.1.1
 websockets==16.0
 e2b_code_interpreter==2.4.1
-pymysql==1.1.2

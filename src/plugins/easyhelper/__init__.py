@@ -34,19 +34,18 @@ async def request_help_handle(args: Message = CommandArg()):
     """
     _help_docs = {
         "ai-talk": """
-    ai cm bk -- 备份历史对话
-    ai cm rt -- 还原历史对话(暂不实现)
-    ai cf add -- 增加配置
-    ai cf show -- 列出配置
-    ai cf delete -- 删除配置(暂不实现)
-    ai cf edit -- 编辑配置(暂不实现)
-    ai cf switch -- 切换配置
+    ai cm bk -- 备份历史对话信息
+    ai cm rt -- 还原历史对话信息(暂时不实现)
+    ai cf add -- 增加配置文件
+    ai cf show -- 列出用户配置
+    ai cf delete -- 删除用户配置(暂时不实现)
+    ai cf edit -- 编辑用户配置(暂时不实现)
+    ai cf switch -- 切换用户配置
     ai load -- 启动AI
-    system [提示词] -- 添加 system 提示词(对话进行时+权限要求)
-    ai save -- 退出AI
-    ai remove -- 删除数据库中的对话
+    ai save -- 暂停AI
+    ai remove -- 删除历史记忆
     ai zp mm -- 压缩内存中缓存的对话
-    ai zp db -- 压缩数据库中的对话""",
+    ai zp db -- 压缩数据库中缓存的对话""",
         "ai-other": """
     tts [角色] [内容] -- 语音合成(当前仅支持中文)
     支持的角色: 原神: 希格雯/神里绫华/胡桃/可莉/芙宁娜
@@ -69,7 +68,6 @@ async def request_help_handle(args: Message = CommandArg()):
         "other": """
     yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
-    today -- 历史上的今天
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

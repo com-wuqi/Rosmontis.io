@@ -1,43 +1,11 @@
 import asyncio
-import time
 from typing import Dict
 
 import httpx
-from e2b_code_interpreter import AsyncSandbox
-from nonebot.log import logger
 
 from . import config
 
-
-class TokenBucket:
-    def __init__(self, rate: float, capacity: float):
-        """
-            令牌桶
-        :param rate: 频率, 个/秒
-        :param capacity: 桶大小, 最大允许多少突发
-        """
-        self.rate = rate
-        self.capacity = capacity
-        self.tokens = capacity  # 初始满桶
-        self.last_refill = time.monotonic()  # 单向时钟
-        self._lock = asyncio.Lock()  # 锁
-
-    async def acquire(self):
-        async with self._lock:
-            while True:
-                now = time.monotonic()
-                elapsed = now - self.last_refill  # 计算时间差
-                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
-                self.last_refill = now  # 刚刚重新填充的桶
-                if self.tokens >= 1:
-                    self.tokens -= 1
-                    return
-                wait_time = (1 - self.tokens) / self.rate
-                await asyncio.sleep(wait_time)
-
 _semaphore_websearch = asyncio.Semaphore(50)  # 网络搜索最大并发
-_semaphore_e2b = asyncio.Semaphore(20)
-_bucket_e2b = TokenBucket(rate=1, capacity=1)
 
 
 async def call_web_search(
@@ -95,39 +63,3 @@ async def call_web_search(
                 return {"error": f"keyError: {e}"}
             except Exception as e:
                 return {"error": f"请求异常: {str(e)}"}
-
-
-async def run_code_in_e2b(code: str, requirements: list, timeout: int = 120):
-    await _bucket_e2b.acquire()
-    async with _semaphore_e2b:
-        try:
-            if config.e2b_api_url != "" and config.e2b_api_url is not None:
-                sandbox = await asyncio.wait_for(
-                    AsyncSandbox.create(api_key=config.e2b_api_key, timeout=timeout),
-                    timeout=60)
-            else:
-                sandbox = await asyncio.wait_for(
-                    AsyncSandbox.create(api_key=config.e2b_api_key, api_url=config.e2b_api_url, timeout=timeout),
-                    timeout=60)
-        except asyncio.TimeoutError as e:
-            logger.error(f"fail to create sandbox: TimeoutError: {e}")
-            return -1
-        except Exception as e:
-            logger.error(f"fail to create sandbox: Exception: {e}")
-            return -1
-
-        if len(requirements) != 0:
-            cmds = f"pip install {' '.join(requirements)}"
-            await sandbox.commands.run(cmds, timeout=timeout)
-
-        exec_codes = await sandbox.run_code(code)
-        await sandbox.kill()
-        return exec_codes.logs.stdout
-
-
-def get_current_time():
-    """
-    获取当前的系统时间，格式为：YYYY-MM-DD HH:MM:SS
-    例如：2025-03-07 14:30:00
-    """
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
