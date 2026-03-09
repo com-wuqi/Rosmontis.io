@@ -6,7 +6,7 @@
 
 文档 [__init__.py](src/plugins/easyhelper/__init__.py)
 
-## 快速开始
+## 手动部署 (推荐)
 
 ### 准备环境
 
@@ -21,6 +21,8 @@ ai相关: openai标准库实现, 暂时不支持图片和文件上传
 MCP 调用需要 `nodejs` `npm` `npx`, 建议安装, 或者进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除相关条目
 
 ### 安装项目依赖
+
+准备虚拟环境, 激活虚拟环境不再赘述,
 
 ```bash
 pip install -r requirements.txt
@@ -56,12 +58,16 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 克隆仓库, 进入目录,
 
-适当修改 `.env.prod`, 然后
+适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
+
+请删除 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 文件中默认提供的 `mcp` 服务器
+
+注意, 容器部署**一般**没办法通过 `stdio` 建立连接, 所以需要修改 [docker-compose.yml](docker-compose.yml) 在容器内部署 或者
+修改网络来访问其他服务器
 
 ```bash
 sudo docker-compose --env-file .env.prod up -d
 sudo docker logs -f napcat
-
 ```
 手动登录, 然后进入webui(token在上面)(一般是 http://127.0.0.1:6099), 添加 网络配置
 

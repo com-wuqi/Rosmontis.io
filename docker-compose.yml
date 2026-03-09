@@ -21,10 +21,10 @@ services:
     volumes:
       # 持久化插件数据
       - rosbot_data:/app/data
-      # 挂载环境配置文件（可选）
-      - ./.env.prod:/app/.env.prod:ro
-      # 挂载自定义插件（可选）
-      - ./src/plugins:/app/src/plugins:ro
+      # 挂载环境配置文件
+      - ./.env.prod:/app/.env.prod
+      # 挂载插件目录
+      - ./src/plugins:/app/src/plugins
     depends_on:
       mysql:
         condition: service_healthy
