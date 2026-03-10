@@ -262,7 +262,11 @@ async def ai_chat_handle(event: MessageEvent):
             for tool_call in _res.tool_calls:
                 # 处理所有调用
                 function_name = tool_call.function.name
-                function_args = json.loads(tool_call.function.arguments)
+                try:
+                    function_args = json.loads(tool_call.function.arguments)
+                except Exception as e:
+                    logger.warning("fail to load tool_call function_args: {}".format(e))
+                    continue
                 try:
                     logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
                     _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)

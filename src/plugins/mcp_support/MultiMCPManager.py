@@ -47,12 +47,20 @@ class MultiMCPManager:
         await self.refresh_tools()
 
     async def _run_server(self, cfg: McpServerConfig):
-        transport = await self._create_transport(cfg)
-        try:
-            read, write = await transport.__aenter__()
-            session = ClientSession(read, write)
 
+        transport = None
+        transport_entered = False
+        session = None
+        session_entered = False
+
+        try:
+            transport = await self._create_transport(cfg)
+            read, write = await transport.__aenter__()
+            transport_entered = True
+
+            session = ClientSession(read, write)
             await session.__aenter__()
+            session_entered = True
             await session.initialize()
 
             self.sessions[cfg.name] = session
@@ -69,11 +77,18 @@ class MultiMCPManager:
             logger.warning(f"Server: {cfg.name} init failed: {e}")
 
         finally:
-            if cfg.name in self.sessions:
-                await self.sessions[cfg.name].__aexit__(None, None, None)
-                del self.sessions[cfg.name]
-            await transport.__aexit__(None, None, None)
-            logger.info(f"Server: {cfg.name} closed")
+            if session_entered:
+                try:
+                    await session.__aexit__(None, None, None)
+                except Exception as e:
+                    logger.warning(f"session: {cfg.name} __aexit__ failed: {e}")
+            self.sessions.pop(cfg.name, None)
+            if transport_entered:
+                try:
+                    await transport.__aexit__(None, None, None)
+                except Exception as e:
+                    logger.warning(f"transport: {cfg.name} __aexit__ failed: {e}")
+            logger.info(f"Server: {cfg.name} finished")
 
     @staticmethod
     async def _create_transport(cfg: McpServerConfig) -> AbstractAsyncContextManager:
@@ -169,6 +184,7 @@ class MultiMCPManager:
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
         self._stop_event.clear()
+        self.sessions.clear()
         self._reset_tool_data()
 
     def get_status(self) -> Dict[str, Any]:

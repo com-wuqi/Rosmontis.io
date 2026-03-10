@@ -41,4 +41,7 @@ mcp_status = on_command("mcp_status")
 
 @mcp_status.handle()
 async def mcp_status_handle():
-    await mcp_status.finish(f"{mcp_manger.get_status()}")
+    if mcp_manger is not None:
+        await mcp_status.finish(f"{mcp_manger.get_status()}")
+    else:
+        await mcp_status.finish("mcp is disabled")
