@@ -40,7 +40,7 @@ async def request_help_handle(args: Message = CommandArg()):
     ai cf show -- 列出配置
     ai cf delete -- 删除配置(暂不实现)
     ai cf edit -- 编辑配置(暂不实现)
-    ai cf switch -- 切换配置
+    ai cf switch [config_id:int] [switch:int] -- 启用/禁用配置:0/1
     ai load -- 启动AI
     system [提示词] -- 添加 system 提示词(对话进行时+权限要求)
     ai save -- 退出AI
@@ -70,6 +70,7 @@ async def request_help_handle(args: Message = CommandArg()):
     yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
+    mcp_status -- MCP 服务状态
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

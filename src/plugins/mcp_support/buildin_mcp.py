@@ -1,51 +1,31 @@
-import asyncio
-import time
+import os
 from typing import Dict
 
 import httpx
 from e2b_code_interpreter import AsyncSandbox
-from nonebot.log import logger
+from mcp.server.fastmcp import FastMCP
 
-from . import config
+from buildin_mcp_share import *
 
-
-class TokenBucket:
-    def __init__(self, rate: float, capacity: float):
-        """
-            令牌桶
-        :param rate: 频率, 个/秒
-        :param capacity: 桶大小, 最大允许多少突发
-        """
-        self.rate = rate
-        self.capacity = capacity
-        self.tokens = capacity  # 初始满桶
-        self.last_refill = time.monotonic()  # 单向时钟
-        self._lock = asyncio.Lock()  # 锁
-
-    async def acquire(self):
-        async with self._lock:
-            while True:
-                now = time.monotonic()
-                elapsed = now - self.last_refill  # 计算时间差
-                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
-                self.last_refill = now  # 刚刚重新填充的桶
-                if self.tokens >= 1:
-                    self.tokens -= 1
-                    return
-                wait_time = (1 - self.tokens) / self.rate
-                await asyncio.sleep(wait_time)
-
-_semaphore_websearch = asyncio.Semaphore(50)  # 网络搜索最大并发
-_semaphore_e2b = asyncio.Semaphore(20)
-_bucket_e2b = TokenBucket(rate=1, capacity=1)
+mcp = FastMCP("rosmontis_mcp")
+env_dict = dict(os.environ)
 
 
+@mcp.tool()
+def get_current_time():
+    """
+    获取当前的系统时间
+    :return: 时间字符串, 格式为：YYYY-MM-DD HH:MM:SS
+    """
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+@mcp.tool()
 async def call_web_search(
         query: str,
         freshness: str,
         summary: bool = True,
         count: int = 10,
-        timeout: float = config.websearch_timeout
 ) -> Dict:
     """
     异步调用 Web Search API（兼容 httpx）
@@ -54,14 +34,14 @@ async def call_web_search(
         query: 搜索关键词
         summary: 是否返回摘要（默认 True）
         count: 返回结果数量（默认 10）
-        timeout: 请求超时时间（默认 60秒）
         freshness: 搜索指定时间范围内的网页 [noLimit,oneDay,oneWeek,oneMonth,oneYear]
 
     Returns:
-        (数据清洗后的)字典，若出错则包含 error 字段, 成功为 success 字段
+        dict，若出错则包含 error 字段, 成功为 success 字段
     """
+    timeout: float = float(env_dict["WEBSEARCH_TIMEOUT"])
     headers = {
-        "Authorization": f"Bearer {config.websearch_api_key}",
+        "Authorization": f"Bearer {env_dict['WEBSEARCH_API_KEY']}",
         "Content-Type": "application/json"
     }
     payload = {
@@ -70,11 +50,15 @@ async def call_web_search(
         "count": count,
         "freshness": freshness,
     }
-    async with _semaphore_websearch:
+    bucket_websearch = get_bucket_websearch()
+    semaphore_websearch = get_websearch_semaphore()
+
+    await bucket_websearch.acquire()
+    async with semaphore_websearch:
         async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 response = await client.post(
-                    config.websearch_base_url,
+                    env_dict["WEBSEARCH_BASE_URL"],
                     headers=headers,
                     json=payload  # httpx 会自动序列化字典为 JSON
                 )
@@ -86,6 +70,7 @@ async def call_web_search(
                     # 数据清洗, 字段更易于阅读
                     data[_ids] = f"标题: {d['name']}\n, url: {d['url']}, 总结: {d['summary']}"
                     _ids += 1
+
                 return {"success": data}
             except httpx.TimeoutException:
                 return {"error": "请求超时"}
@@ -97,24 +82,35 @@ async def call_web_search(
                 return {"error": f"请求异常: {str(e)}"}
 
 
-async def run_code_in_e2b(code: str, requirements: list, timeout: int = 120):
-    await _bucket_e2b.acquire()
-    async with _semaphore_e2b:
+@mcp.tool()
+async def run_code_in_e2b(code: str, requirements: list[str], timeout: int = 120):
+    """
+    通过单次调用来执行 Python 代码, 使用 print 获得返回值
+    :param code: 单次调用所需要执行的代码
+    :param requirements: 每次都需要安装, 运行代码需要安装的包列表，例如 [\"numpy\", \"pandas\"]
+    :param timeout: 容器的有效期, 单位秒, 最长3600秒, 默认120秒
+    :return: str, 运行输出或报错
+    """
+    bucket_e2b = get_bucket_e2b()
+    semaphore_e2b = get_semaphore_e2b()
+
+    await bucket_e2b.acquire()
+    async with semaphore_e2b:
         try:
-            if config.e2b_api_url != "" and config.e2b_api_url is not None:
+            if env_dict["E2B_API_URL"] != "" and env_dict["E2B_API_URL"] is not None:
                 sandbox = await asyncio.wait_for(
-                    AsyncSandbox.create(api_key=config.e2b_api_key, api_url=config.e2b_api_url, timeout=timeout),
+                    AsyncSandbox.create(api_key=env_dict["E2B_API_KEY"], api_url=env_dict["E2B_API_URL"],
+                                        timeout=timeout),
                     timeout=60)
             else:
                 sandbox = await asyncio.wait_for(
-                    AsyncSandbox.create(api_key=config.e2b_api_key, timeout=timeout),
+                    AsyncSandbox.create(api_key=env_dict["E2B_API_KEY"], timeout=timeout),
                     timeout=60)
         except asyncio.TimeoutError as e:
-            logger.error(f"fail to create sandbox: TimeoutError: {e}")
-            return -1
+            return f"fail to create sandbox: TimeoutError: {e}"
+
         except Exception as e:
-            logger.error(f"fail to create sandbox: Exception: {e}")
-            return -1
+            return f"fail to create sandbox: Exception: {e}"
 
         if len(requirements) != 0:
             cmds = f"pip install {' '.join(requirements)}"
@@ -124,10 +120,5 @@ async def run_code_in_e2b(code: str, requirements: list, timeout: int = 120):
         await sandbox.kill()
         return exec_codes.logs.stdout
 
-
-def get_current_time():
-    """
-    获取当前的系统时间，格式为：YYYY-MM-DD HH:MM:SS
-    例如：2025-03-07 14:30:00
-    """
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

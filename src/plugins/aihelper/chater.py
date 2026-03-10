@@ -260,30 +260,27 @@ async def ai_chat_handle(event: MessageEvent):
             }
             _raw_message.append(_assistant_message)
             for tool_call in _res.tool_calls:
-                # 处理所有工具调用
-                if tool_call.function.name == "get_current_time":
-                    _result = agents.get_current_time()
-                    logger.debug(f"called get_current_time: {_result}")
+                # 处理所有调用
+                function_name = tool_call.function.name
+                try:
+                    function_args = json.loads(tool_call.function.arguments)
+                except Exception as e:
+                    logger.warning("fail to load tool_call function_args: {}".format(e))
+                    _raw_message.append(
+                        {"tool_call_id": tool_call.id, "role": "tool", "content": "fail: invalid arguments"})
+                    continue
+                try:
+                    logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
+                    _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
+                    logger.debug(f"MCP : function_name:{function_name} function_result:{_result}")
                     _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
-
-                if tool_call.function.name == "web_search":
-                    # 处理工具 web_search
-                    _searched = await agents.handle_web_search(tool_call=tool_call)
-                    logger.debug(f"called web_search")
-                    _raw_message.append({"tool_call_id": tool_call.id,"role": "tool","content": str(_searched)})
-
-                if tool_call.function.name == "e2b_code":
-                    # 处理工具 e2b
-                    _result = await agents.handle_e2b_sandbox(tool_call=tool_call)
-                    logger.debug(f"called e2b_code")
-                    logger.debug(f"e2b_code raw: {_result}")
-                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
-
-                else:
-                    pass
+                except Exception as e:
+                    logger.warning("fail to call tool : {}".format(e))
+                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": "fail"})
 
             _counts +=1
-    # 锁释放
+
+    # 判断是否被截断
     if _res.tool_calls:
         _reply = "已执行多次工具调用，但未生成完整回答"
     else:

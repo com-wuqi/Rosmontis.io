@@ -6,17 +6,28 @@
 
 文档 [__init__.py](src/plugins/easyhelper/__init__.py)
 
-## 快速开始
+## 手动部署 (推荐)
 
 ### 准备环境
 
 上游实现: 本项目依赖 onebotv11 , 理论上任何支持 onebotv11 的信息提供方都可以接入
 
-ai相关: openai标准库实现, 暂时不支持图片和文件上传
+ai相关: openai标准库实现, 支持自定义 MCP 服务 (支持sse, stdio, streamable-http)
 
 建议使用 `conda` 并为项目配置专用的虚拟环境, 注意需要 `python3>=3.12`, 我们测试时使用的是 3.14.2
 
+准备目录 `mcp_workdir/fs` , 不存在则创建
+
+MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
+
+复制文件 [src/plugins/mcp_support/example.mcp_config.py](src/plugins/mcp_support/example.mcp_config.py) 为
+`src/plugins/mcp_support/mcp_config.py`
+
+如果不使用, 进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除依赖 `nodejs` 的服务器
+
 ### 安装项目依赖
+
+准备虚拟环境, 激活虚拟环境不再赘述,
 
 ```bash
 pip install -r requirements.txt
@@ -30,7 +41,7 @@ pip install -r requirements.txt
 
 ### 准备数据库
 
-推荐使用 mysql + aiomysql , 不支持 sqlite
+推荐使用 mysql + aiomysql , 支持 sqlite , 需要修改 `pymysql`为 `aiosqlite`
 
 安装数据库不再赘述, 记得创建空数据库用于初始化即可
 
@@ -40,9 +51,7 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 ### 调整配置文件
 
-这个项目通过 `.env.prod` 来配置
-
-详见文件 [.env.prod](.env.prod) , 酌情修改
+适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
 
 ### 然后?
 
@@ -52,12 +61,22 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 克隆仓库, 进入目录,
 
-适当修改 `.env.prod`, 然后
+复制文件 [src/plugins/mcp_support/example.mcp_config.py](src/plugins/mcp_support/example.mcp_config.py) 为
+`src/plugins/mcp_support/mcp_config.py`
+
+请删除 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 依赖 `nodejs` 的服务器
+
+注意, 容器部署**一般**没办法通过 `stdio` 建立连接, 所以需要修改 [docker-compose.yml](docker-compose.yml) 在容器内部署 或者
+修改网络来访问其他服务器
 
 ```bash
 sudo docker-compose --env-file .env.prod up -d
-sudo docker logs -f napcat
+```
 
+适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
+
+```bash
+sudo docker logs -f napcat
 ```
 手动登录, 然后进入webui(token在上面)(一般是 http://127.0.0.1:6099), 添加 网络配置
 

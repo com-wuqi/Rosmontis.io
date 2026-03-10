@@ -6,7 +6,6 @@ brotlicffi==1.2.0.0
 cryptography==46.0.5
 email-validator==2.3.0
 fastapi-cli==0.0.20
-githubkit==0.14.6
 h2==4.3.0
 httptools==0.7.1
 nonebot-adapter-onebot==2.4.6
@@ -29,3 +28,6 @@ watchfiles==1.1.1
 websockets==16.0
 e2b_code_interpreter==2.4.1
 pymysql==1.1.2
+mcp==1.26.0
+aiosqlite==0.22.1
+python-dotenv==1.2.1
