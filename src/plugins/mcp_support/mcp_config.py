@@ -33,6 +33,14 @@ mcp_configs = [
         command="npx",
         args=["-y", "@modelcontextprotocol/server-filesystem", "./mcp_workdir/fs"],
         prefix="fs",
+    ),
+    McpServerConfig(
+        name="rosmontis_mcp",
+        transport="stdio",
+        command="python",
+        args=["./src/plugins/mcp_support/buildin_mcp.py"],
+        env={"API_KEY": "secret_123"},
+        prefix="ros",
     )
 ]
 """

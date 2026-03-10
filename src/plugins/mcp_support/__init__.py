@@ -1,4 +1,4 @@
-from nonebot import get_driver
+from nonebot import get_driver, on_command
 from nonebot import get_plugin_config
 from nonebot.plugin import PluginMetadata
 
@@ -34,3 +34,11 @@ async def _init_mcp_support():
 async def _shutdown_mcp_support():
     if config.is_enable:
         await mcp_manger.close_all()
+
+
+mcp_status = on_command("mcp_status")
+
+
+@mcp_status.handle()
+async def mcp_status_handle():
+    await mcp_status.finish(f"{mcp_manger.get_status()}")

@@ -12,13 +12,15 @@
 
 上游实现: 本项目依赖 onebotv11 , 理论上任何支持 onebotv11 的信息提供方都可以接入
 
-ai相关: openai标准库实现, 暂时不支持图片和文件上传
+ai相关: openai标准库实现, 支持自定义 MCP 服务 (支持sse, stdio, streamable-http)
 
 建议使用 `conda` 并为项目配置专用的虚拟环境, 注意需要 `python3>=3.12`, 我们测试时使用的是 3.14.2
 
 准备目录 `mcp_workdir/fs` , 不存在则创建
 
-MCP 调用需要 `nodejs` `npm` `npx`, 建议安装, 或者进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除相关条目
+MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
+
+如果不使用, 进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除依赖 `nodejs` 的服务器
 
 ### 安装项目依赖
 
@@ -60,7 +62,7 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
 
-请删除 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 文件中默认提供的 `mcp` 服务器
+请删除 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 依赖 `nodejs` 的服务器
 
 注意, 容器部署**一般**没办法通过 `stdio` 建立连接, 所以需要修改 [docker-compose.yml](docker-compose.yml) 在容器内部署 或者
 修改网络来访问其他服务器

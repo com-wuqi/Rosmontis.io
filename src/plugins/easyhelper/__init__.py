@@ -70,6 +70,7 @@ async def request_help_handle(args: Message = CommandArg()):
     yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
+    mcp_status -- MCP 服务状态
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:
