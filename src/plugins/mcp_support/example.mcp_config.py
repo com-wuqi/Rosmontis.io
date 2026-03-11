@@ -40,6 +40,10 @@ mcp_configs = [
         command="python",
         args=["./src/plugins/mcp_support/buildin_mcp.py"],
         env={
+            "IS_ENABLE_GET_CURRENT_TIME": "true",  # false
+            "IS_ENABLE_CALL_WEB_SEARCH": "true",
+            "IS_ENABLE_RUN_CODE_IN_E2B": "true",
+            # 时间, 网络搜索, e2b代码沙箱的开关
             "WEBSEARCH_BASE_URL": "https://api.bocha.cn/v1/web-search",
             # 网页搜索 api ,不支持修改, https://open.bochaai.com/ 注册
             "WEBSEARCH_TIMEOUT": "90",
