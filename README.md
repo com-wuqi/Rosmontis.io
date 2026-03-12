@@ -41,7 +41,23 @@ pip install -r requirements.txt
 
 ### 准备数据库
 
-推荐使用 mysql + aiomysql , 支持 sqlite , 需要修改 `pymysql`为 `aiosqlite`
+推荐使用 mysql + aiomysql ,
+
+根据配置文件中的数据库名称(mysql需要)(默认为data), 需要登录后创建空数据库
+
+```sql
+CREATE
+DATABASE data
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+```
+
+支持 sqlite , 需要修改 `pymysql`为 `aiosqlite`, 例如, 注意修改其他配置项
+
+```dotenv
+SQLALCHEMY_DATABASE_URL=sqlite+aiosqlite:///data.db
+APSCHEDULER_CONFIG={"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"sqlite:///data.db","tablename":"apscheduler_jobs"}}}
+```
 
 安装数据库不再赘述, 记得创建空数据库用于初始化即可
 
