@@ -5,6 +5,7 @@ class ScopedConfig(BaseModel):
     """Plugin Config Here"""
     is_enable: bool
     tools_max_once_calls: int
+    is_enable_tool_prompt: bool = True
 
 
 class Config(BaseModel):

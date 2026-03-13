@@ -10,7 +10,9 @@ from buildin_mcp_share import *
 mcp = FastMCP("rosmontis_mcp")
 env_dict = dict(os.environ)
 
-
+dir_list = [os.path.abspath("mcp_workdir/fs"), os.path.abspath("mcp_workdir/memory")]
+for dir_1 in dir_list:
+    os.makedirs(dir_1, exist_ok=True)
 
 def get_current_time():
     """
