@@ -10,5 +10,5 @@ class ScopedConfig(BaseModel):
     text_lang: str
 
 class Config(BaseModel):
-    """插件主配置，包含作用域"""
+    """插件主配置,包含作用域"""
     rvc_gpt_tts: ScopedConfig

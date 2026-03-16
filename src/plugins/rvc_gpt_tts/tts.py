@@ -54,7 +54,7 @@ async def download_file(audio_data):
             temp_path.unlink()
             return voice_msg
         except Exception as e:
-            logger.error(f"发送语音时出错: {traceback.format_exc()}")
+            logger.error(f"在发送语音时出错: {traceback.format_exc()}")
             return -1
 
 

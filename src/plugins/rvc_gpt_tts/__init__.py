@@ -3,7 +3,7 @@ from .config import Config
 
 __plugin_meta__ = PluginMetadata(
     name = "rvc_gpt_tts",
-    description = "图片识别",
+    description = "图片识别插件",
     usage = "",
     config = Config,
 )

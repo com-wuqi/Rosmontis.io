@@ -80,7 +80,7 @@ async def call_gpt_tts(_text: str):
                     return None, error_msg
 
                 if not response.content:
-                    error_msg = "API返回了空内容"
+                    error_msg = "API返回空内容"
                     logger.error(error_msg)
                     return None, error_msg
 
