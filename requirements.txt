@@ -30,3 +30,4 @@ pymysql==1.1.2
 mcp==1.26.0
 aiosqlite==0.22.1
 python-dotenv==1.2.1
+aiofiles==25.1.0

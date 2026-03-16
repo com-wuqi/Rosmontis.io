@@ -1,5 +1,6 @@
 import asyncio
 
+import aiofiles
 import httpx
 from nonebot import require
 from nonebot.log import logger
@@ -37,9 +38,9 @@ async def download_file(url: str, save_path: str):
             async with client.stream("GET", url) as response:
                 try:
                     response.raise_for_status()  # 检查 HTTP 错误
-                    with open(save_path, "wb") as f:
-                        async for chunk in response.aiter_bytes():
-                            f.write(chunk)
+                    async with aiofiles.open(save_path, "wb") as f:
+                        async for chunk in response.aiter_bytes(chunk_size=262144):
+                            await f.write(chunk)
                     return 0
                 except Exception as e:
                     logger.warning(e)
