@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 
 from . import self_build_tts_data
 
-gpt_tts = on_command("tts ai",block=True)
+gpt_tts = on_command("tts ai")
 
 @gpt_tts.handle()
 async def _(event: PrivateMessageEvent,arg: Message = CommandArg()):

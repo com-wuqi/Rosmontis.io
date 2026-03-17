@@ -6,6 +6,7 @@ import aiofiles
 import httpx
 from nonebot import logger, require
 from nonebot.adapters.onebot.v11 import Message
+require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
 from . import config
@@ -15,17 +16,6 @@ import src.plugins.public_apis as sharedFuncs
 
 _bucket_tts = sharedFuncs.TokenBucket(rate=1 / 40, capacity=1)
 _semaphore_file = asyncio.Semaphore(60)
-
-
-if not config.self_tts_api_url:
-    logger.error("未检测到url")
-    raise ValueError("tts_api_url 未配置!")
-if not config.self_ref_audio_path:
-    logger.error("未检测到参考音频路径")
-    raise ValueError("ref_audio_path 未配置!")
-if not config.self_prompt_text:
-    logger.error("未检测到参考音频文本")
-    raise ValueError("prompt_text 未配置!")
 
 
 async def built_url_tts(_text: str):
