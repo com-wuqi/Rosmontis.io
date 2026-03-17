@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Optional, Dict, Literal
 
@@ -25,14 +26,25 @@ class McpServerConfig:
 
 
 # 以下是配置项
+# 工作目录可以自定义, 但是注意需要自行创建
 mcp_init_timeout = 180  # 初始化时间限制 (加载工具列表前)
 mcp_configs = [
     McpServerConfig(
         name="filesystem",
         transport="stdio",
         command="npx",
-        args=["-y", "@modelcontextprotocol/server-filesystem", "./mcp_workdir/fs"],
+        args=["-y", "@modelcontextprotocol/server-filesystem", f"{os.path.abspath("mcp_workdir/fs")}"],
         prefix="fs",
+    ),
+    McpServerConfig(
+        name="server-memory",
+        transport="stdio",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-memory"],
+        env={
+            "MEMORY_FILE_PATH": f"{os.path.abspath("mcp_workdir/memory/memory.json")}"
+        },
+        prefix="memory"
     ),
     McpServerConfig(
         name="rosmontis_mcp",

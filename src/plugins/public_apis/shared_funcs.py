@@ -3,6 +3,7 @@ import time
 
 from nonebot.log import logger
 
+from . import config
 from .napcatqq_upload_stream import OneBotUploadTester
 
 semaphore_upload = asyncio.Semaphore(10)
@@ -36,10 +37,23 @@ class TokenBucket:
 
 
 async def upload_file(path: str) -> str:
+    if not config.is_enable_upload:
+        return path
     async with semaphore_upload:
         upload = OneBotUploadTester()
-        await upload.connect()
-        remote_path = await upload.upload_file_stream_batch(file_path=path, chunk_size=1024 * 1024)
-        await upload.disconnect()
-        logger.debug("remote_path: {}".format(remote_path))
-        return remote_path
+        is_connected = False
+        try:
+            await upload.connect()
+            is_connected = True
+            remote_path = await upload.upload_file_stream_batch(file_path=path, chunk_size=1024 * 1024)
+            await upload.disconnect()
+            logger.debug("remote_path: {}".format(remote_path))
+            return remote_path
+        except Exception as e:
+            logger.error("failed to upload file: {}".format(e))
+            if is_connected:
+                try:
+                    await upload.disconnect()
+                except Exception as e:
+                    logger.error("failed to disconnect: {}".format(e))
+            return ""

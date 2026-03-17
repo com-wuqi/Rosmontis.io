@@ -10,7 +10,9 @@ from buildin_mcp_share import *
 mcp = FastMCP("rosmontis_mcp")
 env_dict = dict(os.environ)
 
-
+dir_list = [os.path.abspath("mcp_workdir/fs"), os.path.abspath("mcp_workdir/memory")]
+for dir_1 in dir_list:
+    os.makedirs(dir_1, exist_ok=True)
 
 def get_current_time():
     """
@@ -96,7 +98,7 @@ async def run_code_in_e2b(code: str, requirements: list[str], timeout: int = 120
     await bucket_e2b.acquire()
     async with semaphore_e2b:
         try:
-            if not env_dict.get("E2B_API_URL"):
+            if env_dict.get("E2B_API_URL"):
                 sandbox = await asyncio.wait_for(
                     AsyncSandbox.create(api_key=env_dict["E2B_API_KEY"], api_url=env_dict["E2B_API_URL"],
                                         timeout=timeout),
