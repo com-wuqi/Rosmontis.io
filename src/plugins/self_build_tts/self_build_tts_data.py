@@ -15,7 +15,7 @@ import src.plugins.public_apis as sharedFuncs
 
 
 _bucket_tts = sharedFuncs.TokenBucket(rate=1 / 40, capacity=1)
-_semaphore_file = asyncio.Semaphore(60)
+_semaphore_file = asyncio.Semaphore(20)
 
 
 async def built_url_tts(_text: str):
@@ -73,8 +73,7 @@ async def download_tts_file(get_request_url: str):
                     # 校验 Content-Length 如果有的话，防止空响
                     async with aiofiles.open(temp_path, "wb") as f:
                         async for chunk in response.aiter_bytes(chunk_size=262144):
-                            if chunk:
-                                await f.write(chunk)
+                            await f.write(chunk)
 
             # 3. 验证文件
             if not temp_path.exists():
