@@ -1,20 +1,26 @@
 import asyncio
+import time
 from urllib.parse import quote
 
 import httpx
-from nonebot import logger
-from . import config
-from ..public_apis import TokenBucket
+from nonebot import logger, require
+from nonebot.adapters.onebot.v11 import Message
+import nonebot_plugin_localstore as store
 
-_bucket_tts = TokenBucket(rate=1 / 40, capacity=1)
+from . import config
+require("src.plugins.public_apis")
+import src.plugins.public_apis as sharedFuncs
+
+
+_bucket_tts = sharedFuncs.TokenBucket(rate=1 / 40, capacity=1)
 _semaphore_file = asyncio.Semaphore(60)
 
 # 导入配置
-tts_api_url = config.tts_api_url
-ref_audio_path = config.ref_audio_path
-prompt_text = config.prompt_text
-prompt_lang = config.prompt_lang
-text_lang = config.text_lang
+tts_api_url = config.gpt_tts_api_url
+ref_audio_path = config.gpt_ref_audio_path
+prompt_text = config.gpt_prompt_text
+prompt_lang = config.gpt_prompt_lang
+text_lang = config.gpt_text_lang
 
 
 if not tts_api_url:
@@ -27,11 +33,13 @@ if not prompt_text:
     logger.error("未检测到参考音频文本")
     raise ValueError("prompt_text 未配置!")
 
-async def call_gpt_tts(_text: str):
+
+async def built_gpt_tts(_text: str):
+    """处理请求参数并构建url"""
     if not _text:
-        return None, "文本为空"
+        return None
     await _bucket_tts.acquire()
-    text = _text
+    text = _text.strip()
     # 构建请求参数
     encode_text = quote(text, encoding="utf-8", safe="")
     encode_ref_audio_path = quote(ref_audio_path, encoding="utf-8", safe="")
@@ -62,45 +70,80 @@ async def call_gpt_tts(_text: str):
         f"super_sampling=false"
     )
 
-    logger.info(f"API地址: {get_request_url}")
-    logger.info(f"请求文本: {text}")
+    logger.debug(f"API地址: {get_request_url}")
+    logger.debug(f"请求文本: {text}")
+    return get_request_url
 
+
+async def download_tts_file(get_request_url: str):
+    """获取url并下载音频同时进行文件管理"""
     try:
         async with _semaphore_file:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    get_request_url,
-                    timeout=30
-                )
-                logger.info(f"API响应状态码: {response.status_code}")
+            # 1. 创建临时文件
+            temp_path = store.get_plugin_cache_file(f"rvc_gpt_tts-{time.time()}.wav")
 
-                if response.status_code != 200:
-                    error_msg = f"API返回错误码: {response.status_code}, 响应内容: {response.text}"
-                    logger.error(error_msg)
-                    return None, error_msg
+            # 2. 下载音频
+            async with httpx.AsyncClient(timeout=60.0, max_redirects=5) as client:
+                try:
+                    async with client.stream("GET", get_request_url) as response:
+                        response.raise_for_status()
 
-                if not response.content:
-                    error_msg = "API返回空内容"
-                    logger.error(error_msg)
-                    return None, error_msg
+                        # 确保父目录存在（store 可能不会自动创建）
+                        temp_path.parent.mkdir(parents=True, exist_ok=True)
 
-                logger.success(f"成功获取返回音频，大小为 {len(response.content)} 字节")
-                return response.content, None
+                        with open(temp_path, "wb") as f:
+                            async for chunk in response.aiter_bytes():
+                                if chunk:  # 防止空块
+                                    f.write(chunk)
+
+                except httpx.HTTPStatusError as e:
+                    return None, f"API返回错误状态: {e.response.status_code}"
+                except httpx.RequestError as e:
+                    return None, f"网络请求错误: {str(e)}"
+
+            # 3. 验证文件
+            if not temp_path.exists():
+                return None, "文件下载失败：未找到文件"
+
+            file_size = temp_path.stat().st_size
+            if file_size == 0:
+                temp_path.unlink(missing_ok=True)  # 清理空文件
+                return None, "文件下载失败：内容为空"
+
+            # 4. 上传文件
+            if not sharedFuncs:
+                return None, "共享模块未加载"
+
+            remote_path = await sharedFuncs.upload_file(path=str(temp_path))
+
+            if not remote_path:
+                return None, "文件上传失败"
+
+            # 5. 清理临时文件（放在最后，无论成功失败都清理）
+            try:
+                temp_path.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"清理临时文件失败: {e}")
+
+            return remote_path, None
 
     except httpx.ConnectTimeout as e:
         error_msg = f"连接API超时: {str(e)}"
         logger.error(error_msg)
         return None, error_msg
+
     except httpx.TimeoutException as e:
         error_msg = f"请求超时: {str(e)}"
         logger.error(error_msg)
         return None, error_msg
+
     except httpx.ConnectError as e:
         error_msg = f"无法连接到API服务器: {str(e)}"
         logger.error(error_msg)
         return None, error_msg
+
     except Exception as e:
         import traceback
         error_msg = f"请求异常: {str(e)}"
-        logger.error(f"完整的错误堆栈:\n{traceback.format_exc()}")
+        logger.error(error_msg)
         return None, error_msg
