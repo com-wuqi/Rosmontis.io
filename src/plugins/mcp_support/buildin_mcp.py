@@ -10,8 +10,10 @@ from buildin_mcp_share import *
 mcp = FastMCP("rosmontis_mcp")
 env_dict = dict(os.environ)
 
+dir_list = [os.path.abspath("mcp_workdir/fs"), os.path.abspath("mcp_workdir/memory")]
+for dir_1 in dir_list:
+    os.makedirs(dir_1, exist_ok=True)
 
-@mcp.tool()
 def get_current_time():
     """
     获取当前的系统时间
@@ -20,7 +22,7 @@ def get_current_time():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
-@mcp.tool()
+
 async def call_web_search(
         query: str,
         freshness: str,
@@ -82,7 +84,6 @@ async def call_web_search(
                 return {"error": f"请求异常: {str(e)}"}
 
 
-@mcp.tool()
 async def run_code_in_e2b(code: str, requirements: list[str], timeout: int = 120):
     """
     通过单次调用来执行 Python 代码, 使用 print 获得返回值
@@ -97,7 +98,7 @@ async def run_code_in_e2b(code: str, requirements: list[str], timeout: int = 120
     await bucket_e2b.acquire()
     async with semaphore_e2b:
         try:
-            if env_dict["E2B_API_URL"] != "" and env_dict["E2B_API_URL"] is not None:
+            if env_dict.get("E2B_API_URL"):
                 sandbox = await asyncio.wait_for(
                     AsyncSandbox.create(api_key=env_dict["E2B_API_KEY"], api_url=env_dict["E2B_API_URL"],
                                         timeout=timeout),
@@ -121,4 +122,23 @@ async def run_code_in_e2b(code: str, requirements: list[str], timeout: int = 120
         return exec_codes.logs.stdout
 
 if __name__ == "__main__":
+
+    is_enable_get_current_time = env_dict.get("IS_ENABLE_GET_CURRENT_TIME", "false")
+    is_enable_call_web_search = env_dict.get("IS_ENABLE_CALL_WEB_SEARCH", "false")
+    is_enable_run_code_in_e2b = env_dict.get("IS_ENABLE_RUN_CODE_IN_E2B", "false")
+
+    if is_enable_get_current_time == "true":
+        mcp.add_tool(get_current_time)
+    if is_enable_call_web_search == "true":
+        if env_dict.get("WEBSEARCH_BASE_URL") and env_dict.get("WEBSEARCH_TIMEOUT") and env_dict.get(
+                "WEBSEARCH_API_KEY"):
+            mcp.add_tool(call_web_search)
+        else:
+            pass
+    if is_enable_run_code_in_e2b == "true":
+        if env_dict.get("E2B_API_KEY"):
+            mcp.add_tool(run_code_in_e2b)
+        else:
+            pass
+
     mcp.run(transport="stdio")

@@ -4,14 +4,14 @@ from nonebot.plugin import PluginMetadata
 from .config import Config
 
 __plugin_meta__ = PluginMetadata(
-    name="napcat_apis",
+    name="public_apis",
     description="",
     usage="",
     config=Config,
 )
 
 _config = get_plugin_config(Config)
-config = _config.napcatapi
+config = _config.publicapi
 
-if config.is_enable:
-    from .napcatqq_upload_stream import OneBotUploadTester
+from .napcatqq_upload_stream import OneBotUploadTester
+from .shared_funcs import *

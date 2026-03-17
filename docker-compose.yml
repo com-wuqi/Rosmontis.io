@@ -15,7 +15,7 @@ services:
       # 从 .env.prod 加载，这里可以覆盖
       - SQLALCHEMY_DATABASE_URL=mysql+aiomysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data
       - ONEBOT_WS_URLS=["ws://napcat:3001/onebot/v11/ws"]
-      - NAPCATAPI__UPLOAD_WS_URL=ws://napcat:3001
+      - PUBLICAPI__UPLOAD_WS_URL=ws://napcat:3001
       - APSCHEDULER_CONFIG={"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"mysql+pymysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data","tablename":"apscheduler_jobs"}}}
 
     volumes:

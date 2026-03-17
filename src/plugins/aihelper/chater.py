@@ -6,12 +6,11 @@ from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Private
 from nonebot.internal.params import ArgPlainText
 
 require("nonebot_plugin_orm")
-from nonebot_plugin_orm import get_session, async_scoped_session
+from nonebot_plugin_orm import async_scoped_session
 from . import config
 require("nonebot_plugin_apscheduler")
-from nonebot_plugin_apscheduler import scheduler
 from .aihelper_handles import *
-
+from .system_prompts import tool_system_prompts_list
 _Messages_dicts = {}
 # 这里应该是 {comments_id : Messages} 这里的id用于区分不同用户
 # 这个池子存储所有用户的所有对话信息
@@ -85,7 +84,8 @@ def generate_zip_message(raw_message:list):
             # 未知
             dialog_lines.append(f"{role}: {msg.get('content', '')}")
 
-    _msg = _system + [{"role": "system", "content": "你是一个专业的对话总结助手，擅长提取核心信息，回答简洁明了。请关注助手调用了哪些工具及其作用。"},
+    _msg = _system + [{"role": "system",
+                       "content": "不要调用任何工具。你是一个专业的对话总结助手，擅长提取核心信息，回答简洁明了。请关注助手调用了哪些工具及其作用。"},
             {"role": "user","content":f"""请用**简洁的中文**总结以下对话的主要内容，包括讨论的主题、关键问题和结论。
             如果对话中提到了具体任务或决定，请一并概括。
             对话历史 : {chr(10).join(dialog_lines)}"""}]
@@ -112,7 +112,7 @@ async def common_zip_message(_input_msg:list,row:dict) -> list:
         _chunks_zipped_messages.append(_res.content)
 
     final_prompt = [{"role": "user",
-                     "content": f"请将以下关于同一对话的多个片段摘要整合成一个连贯的总体总结：\n" + "\n".join(
+                     "content": f"不要调用任何工具。请将以下关于同一对话的多个片段摘要整合成一个连贯的总体总结：\n" + "\n".join(
                          _chunks_zipped_messages)}]
     _res = await send_messages_to_ai(
         key=row.api_key, url=row.url, model_name=row.model_name,
@@ -125,6 +125,11 @@ async def common_zip_message(_input_msg:list,row:dict) -> list:
 
 @start_ai.handle()
 async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
+    if config.is_enable_tool_prompt:
+        _tool_prompts = tool_system_prompts_list
+    else:
+        _tool_prompts = []
+
     session_id,session_type = get_comments_id(event)
     lock = get_session_lock(session_id)
     async with lock:
@@ -149,17 +154,22 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
             if len(_raw_message)>0:
                 # 执行 HOOK, 仅仅排除一种情况
                 if _raw_message[0]["role"] != "system":
-                    _raw_message.insert(0,{"role": "system", "content": f"{_config_settings[session_id].system}"})
+                    _raw_message[:0] = [{"role": "system", "content": _config_settings[session_id].system}]
+                    _raw_message[1:1] = _tool_prompts
                 else:
                     pass
             else:
+                # 此处长度为 0
                 _raw_message.append({"role": "system", "content": f"{_config_settings[session_id].system}"})
+                _raw_message.extend(_tool_prompts)
         except KeyError:
+            # 处理不存在
             _Messages_dicts[session_id] = []
             _raw_message: list = _Messages_dicts[session_id]
             _raw_message.append({"role": "system", "content": f"{_config_settings[session_id].system}"})
+            _raw_message.extend(_tool_prompts)
 
-        # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
+    # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
     await start_ai.finish("收到喵~ 主人我们来聊天喵~")
 
 @stop_ai.handle()
@@ -204,7 +214,7 @@ async def ai_chat_handle(event: MessageEvent):
         try:
             _raw_message:list = _Messages_dicts[session_id]
         except KeyError:
-            logger.info("empty message_list")
+            logger.warning("empty message_list, skipped system prompts hook (for tools)")
             _Messages_dicts[session_id] = []
             _raw_message: list = _Messages_dicts[session_id]
 
@@ -220,11 +230,8 @@ async def ai_chat_handle(event: MessageEvent):
                 await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
 
         else:
-            # 常规对话
-            if session_type == "PrivateMessageEvent":
-                _raw_message.append({"role": "user", "content": f"{msg}"})
-            else:
-                _raw_message.append({"role": "user", "content": f"用户{event.user_id}: {msg}"})
+            # 常规对话:
+            _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
 
         _event_setting = _config_settings[session_id]
         # 指定配置文件
@@ -327,7 +334,7 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
         _return_msg = await common_zip_message(row=row,_input_msg=_Messages_dicts[session_id])
         _Messages_dicts[session_id] = _return_msg
 
-        await zip_memory_ai.finish("压缩已完成: 一定要运行 ai save 否则视为放弃删除")
+        await zip_memory_ai.finish("压缩已完成: 一定要运行 ai save 否则不会被保存到数据库")
 
 
 @zip_db_ai.handle()
@@ -365,76 +372,75 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
         else:
             await zip_db_ai.finish("db is empty, finished")
 
+# # 自动压缩逻辑(内存中, 缺少测试)
+# @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")
+# async def auto_zip_chat_in_memory():
+#     async with get_session() as session:
+#         session_ids = list(_ai_switch.keys())  # 从内存中提取keys
+#         for session_id in session_ids:
+#
+#             if _ai_switch.get(session_id, True):
+#                 # 开关状态, 不存在视为内存中无数据
+#                 continue
+#             lock = get_session_lock(session_id)
+#             row = await get_config_by_id(sid=session_id, session=session)
+#             # 自动清理的token由session发起者承担, 或者是 id=1 承担
+#             # 但是在群聊信息中, 这里一定会是 id=1 承担 token
+#
+#             try:
+#                 _raw_message: list = _Messages_dicts[session_id]
+#                 if len(_raw_message) <= row.max_length:
+#                     # 内存中过小或不存在的不需要压缩
+#                     continue
+#             except KeyError:
+#                 continue
+#
+#             try:
+#                 await asyncio.wait_for(lock.acquire(), timeout=0)
+#             except asyncio.TimeoutError:
+#                 continue  # 锁被占用，跳过
+#
+#             try:
+#                 _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])
+#                 _Messages_dicts[session_id] = _return_msg
+#             except Exception as e:
+#                 logger.error("Error : {}".format(e))
+#             finally:
+#                 lock.release()  # fix 释放锁
 
-# 自动压缩逻辑(内存中, 缺少测试)
-@scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")
-async def auto_zip_chat_in_memory():
-    async with get_session() as session:
-        session_ids = list(_ai_switch.keys())  # 从内存中提取keys
-        for session_id in session_ids:
 
-            if _ai_switch.get(session_id, True):
-                # 开关状态, 不存在视为内存中无数据
-                continue
-            lock = get_session_lock(session_id)
-            row = await get_config_by_id(sid=session_id, session=session)
-            # 自动清理的token由session发起者承担, 或者是 id=1 承担
-            # 但是在群聊信息中, 这里一定会是 id=1 承担 token
-
-            try:
-                _raw_message: list = _Messages_dicts[session_id]
-                if len(_raw_message) <= row.max_length:
-                    # 内存中过小或不存在的不需要压缩
-                    continue
-            except KeyError:
-                continue
-
-            try:
-                await asyncio.wait_for(lock.acquire(), timeout=0)
-            except asyncio.TimeoutError:
-                continue  # 锁被占用，跳过
-
-            try:
-                _return_msg = await common_zip_message(row=row, _input_msg=_Messages_dicts[session_id])
-                _Messages_dicts[session_id] = _return_msg
-            except Exception as e:
-                logger.error("Error : {}".format(e))
-            finally:
-                lock.release()  # fix 释放锁
-
-
-@scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_db")
-async def auto_zip_chat_in_db():
-    async with get_session() as session:
-        session_ids = await get_all_comment_ids(session)
-        for session_id in session_ids:
-            if _ai_switch.get(session_id, False):
-                # 开关状态,
-                continue
-            lock = get_session_lock(session_id)
-            row = await get_config_by_id(sid=session_id, session=session)
-            # 但是在群聊信息中, 这里一定会是 id=1 承担 token
-            try:
-                # 锁状态
-                await asyncio.wait_for(lock.acquire(), timeout=0.1)
-            except asyncio.TimeoutError:
-                continue  # 锁被占用，跳过
-            _res = await get_comments_by_id(sid=session_id, session=session)
-
-            if _res is None or not _res.message:
-                lock.release()
-                continue
-            _msgs: list = json.loads(_res.message)
-            if len(_msgs) <= row.max_length:
-                lock.release()
-                continue
-
-            try:
-                _return_msg = await common_zip_message(row=row, _input_msg=_msgs)
-                _save = await update_comments_by_id(sid=session_id, session=session, msg=json.dumps(_return_msg))
-                if _save != 0:
-                    await zip_db_ai.send("zip_db_ai. failed")
-            except Exception as e:
-                logger.error("Error : {}".format(e))
-            finally:
-                lock.release()
+# @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_db")
+# async def auto_zip_chat_in_db():
+#     async with get_session() as session:
+#         session_ids = await get_all_comment_ids(session)
+#         for session_id in session_ids:
+#             if _ai_switch.get(session_id, False):
+#                 # 开关状态,
+#                 continue
+#             lock = get_session_lock(session_id)
+#             row = await get_config_by_id(sid=session_id, session=session)
+#             # 但是在群聊信息中, 这里一定会是 id=1 承担 token
+#             try:
+#                 # 锁状态
+#                 await asyncio.wait_for(lock.acquire(), timeout=0.1)
+#             except asyncio.TimeoutError:
+#                 continue  # 锁被占用，跳过
+#             _res = await get_comments_by_id(sid=session_id, session=session)
+#
+#             if _res is None or not _res.message:
+#                 lock.release()
+#                 continue
+#             _msgs: list = json.loads(_res.message)
+#             if len(_msgs) <= row.max_length:
+#                 lock.release()
+#                 continue
+#
+#             try:
+#                 _return_msg = await common_zip_message(row=row, _input_msg=_msgs)
+#                 _save = await update_comments_by_id(sid=session_id, session=session, msg=json.dumps(_return_msg))
+#                 if _save != 0:
+#                     await zip_db_ai.send("zip_db_ai. failed")
+#             except Exception as e:
+#                 logger.error("Error : {}".format(e))
+#             finally:
+#                 lock.release()

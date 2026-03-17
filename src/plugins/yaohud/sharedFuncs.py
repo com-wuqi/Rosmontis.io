@@ -1,43 +1,16 @@
 import asyncio
-import time
 
+import aiofiles
 import httpx
 from nonebot import require
 from nonebot.log import logger
 
-from . import config
-
-require("src.plugins.napcat_apis")
-import src.plugins.napcat_apis as napcat_apis
+require("src.plugins.public_apis")
+import src.plugins.public_apis as public_apis
 
 semaphore_download = asyncio.Semaphore(20)
-semaphore_upload = asyncio.Semaphore(10)
 
-class TokenBucket:
-    def __init__(self, rate: float, capacity: float):
-        """
-            令牌桶
-        :param rate: 频率, 个/秒
-        :param capacity: 桶大小, 最大允许多少突发
-        """
-        self.rate = rate
-        self.capacity = capacity
-        self.tokens = capacity  # 初始满桶
-        self.last_refill = time.monotonic()  # 单向时钟
-        self._lock = asyncio.Lock()  # 锁
-
-    async def acquire(self):
-        async with self._lock:
-            while True:
-                now = time.monotonic()
-                elapsed = now - self.last_refill  # 计算时间差
-                self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
-                self.last_refill = now  # 刚刚重新填充的桶
-                if self.tokens >= 1:
-                    self.tokens -= 1
-                    return
-                wait_time = (1 - self.tokens) / self.rate
-                await asyncio.sleep(wait_time)
+TokenBucket = public_apis.TokenBucket
 
 
 async def download_file(url: str, save_path: str):
@@ -63,9 +36,9 @@ async def download_file(url: str, save_path: str):
             async with client.stream("GET", url) as response:
                 try:
                     response.raise_for_status()  # 检查 HTTP 错误
-                    with open(save_path, "wb") as f:
-                        async for chunk in response.aiter_bytes():
-                            f.write(chunk)
+                    async with aiofiles.open(save_path, "wb") as f:
+                        async for chunk in response.aiter_bytes(chunk_size=262144):
+                            await f.write(chunk)
                     return 0
                 except Exception as e:
                     logger.warning(e)
@@ -73,12 +46,5 @@ async def download_file(url: str, save_path: str):
 
 
 async def upload_file(path: str) -> str:
-    if not config.is_enable_upload:
-        return path
-    async with semaphore_upload:
-        upload = napcat_apis.OneBotUploadTester()
-        await upload.connect()
-        remote_path = await upload.upload_file_stream_batch(file_path=path, chunk_size=1024 * 1024)
-        await upload.disconnect()
-        logger.debug("img remote_path: {}".format(remote_path))
-        return remote_path
+    _res = await public_apis.upload_file(path)
+    return _res

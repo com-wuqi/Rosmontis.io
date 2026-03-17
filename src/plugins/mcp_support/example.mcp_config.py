@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from typing import Optional, Dict, Literal
 
@@ -25,14 +26,25 @@ class McpServerConfig:
 
 
 # 以下是配置项
+# 工作目录可以自定义, 但是注意需要自行创建
 mcp_init_timeout = 180  # 初始化时间限制 (加载工具列表前)
 mcp_configs = [
     McpServerConfig(
         name="filesystem",
         transport="stdio",
         command="npx",
-        args=["-y", "@modelcontextprotocol/server-filesystem", "./mcp_workdir/fs"],
+        args=["-y", "@modelcontextprotocol/server-filesystem", f"{os.path.abspath("mcp_workdir/fs")}"],
         prefix="fs",
+    ),
+    McpServerConfig(
+        name="server-memory",
+        transport="stdio",
+        command="npx",
+        args=["-y", "@modelcontextprotocol/server-memory"],
+        env={
+            "MEMORY_FILE_PATH": f"{os.path.abspath("mcp_workdir/memory/memory.json")}"
+        },
+        prefix="memory"
     ),
     McpServerConfig(
         name="rosmontis_mcp",
@@ -40,6 +52,10 @@ mcp_configs = [
         command="python",
         args=["./src/plugins/mcp_support/buildin_mcp.py"],
         env={
+            "IS_ENABLE_GET_CURRENT_TIME": "true",  # false
+            "IS_ENABLE_CALL_WEB_SEARCH": "true",
+            "IS_ENABLE_RUN_CODE_IN_E2B": "true",
+            # 时间, 网络搜索, e2b代码沙箱的开关
             "WEBSEARCH_BASE_URL": "https://api.bocha.cn/v1/web-search",
             # 网页搜索 api ,不支持修改, https://open.bochaai.com/ 注册
             "WEBSEARCH_TIMEOUT": "90",
