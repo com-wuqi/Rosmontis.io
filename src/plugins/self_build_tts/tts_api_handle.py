@@ -5,7 +5,7 @@ from urllib.parse import quote
 import aiofiles
 import httpx
 from nonebot import logger, require
-from nonebot.adapters.onebot.v11 import Message
+
 require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
@@ -18,7 +18,7 @@ _bucket_tts = sharedFuncs.TokenBucket(rate=1 / 40, capacity=1)
 _semaphore_file = asyncio.Semaphore(20)
 
 
-async def built_url_tts(_text: str):
+async def built_gpt_sovits_url_tts(_text: str):
     """处理请求参数并构建url"""
     if not _text:
         return None
@@ -26,7 +26,7 @@ async def built_url_tts(_text: str):
     text = _text.strip()
     # 构建请求参数
     encode_text = quote(text, encoding="utf-8", safe="")
-    encode_ref_audio_path = quote(config.self_ref_audio_path, encoding="utf-8", safe="")
+    encode_ref_audio_path = quote(config.gpt_sovits_ref_audio_path, encoding="utf-8", safe="")
     encode_prompt_text = quote(config.self_prompt_text, encoding="utf-8", safe="")
 
     get_request_url = (
@@ -59,7 +59,7 @@ async def built_url_tts(_text: str):
     return get_request_url
 
 
-async def download_tts_file(get_request_url: str):
+async def download_gpt_sovits_tts_file(get_request_url: str):
     """获取url并下载音频同时进行文件管理"""
     try:
         async with _semaphore_file:
