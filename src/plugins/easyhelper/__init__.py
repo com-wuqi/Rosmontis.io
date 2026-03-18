@@ -48,7 +48,7 @@ async def request_help_handle(args: Message = CommandArg()):
     ai zp mm -- 压缩内存中缓存的对话
     ai zp db -- 压缩数据库中的对话""",
         "ai-other": """
-    tts [角色] [内容] -- 语音合成(当前仅支持中文)
+    yaohud-tts [角色] [内容] -- 妖狐数据 语音合成(当前仅支持中文)
     支持的角色: 原神: 希格雯/神里绫华/胡桃/可莉/芙宁娜
     星穹铁道: 阮梅
     明日方舟: 多萝西

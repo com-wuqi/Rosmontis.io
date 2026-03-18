@@ -169,6 +169,10 @@ https://github.com/gfhdhytghd/qzone-toolkit
 
 https://github.com/sansenjian/quick-e2b-sandbox
 
+## 自建TTS支持 (实验性功能, 不稳定)
+
+[TTS_Support.md](TTS_Support.md)
+
 ## 小工具
 
 [compare_env.py](compare_env.py) : 比较配置文件的环境变量条目是否相同

@@ -11,30 +11,29 @@ import nonebot_plugin_localstore as store
 
 from . import config
 require("src.plugins.public_apis")
-import src.plugins.public_apis as sharedFuncs
+import src.plugins.public_apis as public_apis
 
-
-_bucket_tts = sharedFuncs.TokenBucket(rate=1 / 40, capacity=1)
-_semaphore_file = asyncio.Semaphore(20)
+_bucket_gpt_sovits = public_apis.TokenBucket(rate=1 / 40, capacity=1)
+_semaphore_file_gpt_sovits = asyncio.Semaphore(20)
 
 
 async def built_gpt_sovits_url_tts(_text: str):
     """处理请求参数并构建url"""
     if not _text:
         return None
-    await _bucket_tts.acquire()
+    await _bucket_gpt_sovits.acquire()
     text = _text.strip()
     # 构建请求参数
     encode_text = quote(text, encoding="utf-8", safe="")
     encode_ref_audio_path = quote(config.gpt_sovits_ref_audio_path, encoding="utf-8", safe="")
-    encode_prompt_text = quote(config.self_prompt_text, encoding="utf-8", safe="")
+    encode_prompt_text = quote(config.gpt_sovits_prompt_text, encoding="utf-8", safe="")
 
     get_request_url = (
-        f"{config.self_tts_api_url}?"
+        f"{config.gpt_sovits_tts_api_url}?"
         f"text={encode_text}&"
-        f"text_lang={config.self_text_lang}&"
+        f"text_lang={config.gpt_sovits_text_lang}&"
         f"ref_audio_path={encode_ref_audio_path}&"
-        f"prompt_lang={config.self_prompt_lang}&"
+        f"prompt_lang={config.gpt_sovits_prompt_lang}&"
         f"prompt_text={encode_prompt_text}&"
         f"top_k=5&"
         f"top_p=1&"
@@ -54,15 +53,15 @@ async def built_gpt_sovits_url_tts(_text: str):
         f"super_sampling=false"
     )
 
-    logger.debug(f"API地址: {get_request_url}")
-    logger.debug(f"请求文本: {text}")
+    logger.debug(f"gpt_sovits url: {get_request_url}")
+    logger.debug(f"gpt_sovits text: {text}")
     return get_request_url
 
 
 async def download_gpt_sovits_tts_file(get_request_url: str):
     """获取url并下载音频同时进行文件管理"""
     try:
-        async with _semaphore_file:
+        async with _semaphore_file_gpt_sovits:
             # 1. 创建临时文件路径
             temp_path = store.get_plugin_cache_file(f"rvc_gpt_tts-{time.time()}.wav")
 
@@ -85,7 +84,7 @@ async def download_gpt_sovits_tts_file(get_request_url: str):
 
             # 4. 上传文件
             try:
-                remote_path = await sharedFuncs.upload_file(path=str(temp_path))
+                remote_path = await public_apis.upload_file(path=str(temp_path))
             except Exception as e:
                 logger.exception("文件上传失败")
                 return None, "文件上传失败"

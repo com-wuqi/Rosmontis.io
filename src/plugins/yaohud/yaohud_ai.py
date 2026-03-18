@@ -4,7 +4,7 @@ from nonebot.params import CommandArg
 
 from .yaohud_ai_handle import get_index_tts2, get_weijin, get_yaohu_picture
 
-index_tts2 = on_command("tts")
+index_tts2 = on_command("yaohud-tts")
 weijin_check = on_command("weijin")
 yaohu_picture_ai = on_command("aidraw")
 
