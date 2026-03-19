@@ -37,6 +37,8 @@ MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
 pip install -r requirements.txt
 ```
 
+如果需要使用自建TTS支持, 然后执行 `pip install gradio_client`
+
 使用 `nb plugin` 更新所需插件
 
 必要时参考 https://nonebot.dev/docs/quick-start 安装 `pipx` 和 `nonebot` 本体
@@ -78,6 +80,8 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 然后就能用了, 还有问题可提 issue
 
 ## docker 手动构建
+
+*不支持自建TTS和一部分MCP服务器*
 
 克隆仓库, 进入目录,
 

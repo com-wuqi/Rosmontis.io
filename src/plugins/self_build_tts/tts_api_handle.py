@@ -12,10 +12,11 @@ import nonebot_plugin_localstore as store
 from . import config
 require("src.plugins.public_apis")
 import src.plugins.public_apis as public_apis
+from gradio_client import Client
 
 _bucket_gpt_sovits = public_apis.TokenBucket(rate=1 / 40, capacity=1)
-_semaphore_file_gpt_sovits = asyncio.Semaphore(20)
-
+_bucket_qwen3_customvoice = public_apis.TokenBucket(rate=1 / 40, capacity=1)
+_bucket_qwen3_voice_design = public_apis.TokenBucket(rate=1 / 40, capacity=1)
 
 async def built_gpt_sovits_url_tts(_text: str):
     """处理请求参数并构建url"""
@@ -60,51 +61,45 @@ async def built_gpt_sovits_url_tts(_text: str):
 
 async def download_gpt_sovits_tts_file(get_request_url: str):
     """获取url并下载音频同时进行文件管理"""
+    temp_path = store.get_plugin_cache_file(f"rvc_gpt_tts-{time.time()}.wav")
     try:
-        async with _semaphore_file_gpt_sovits:
-            # 1. 创建临时文件路径
-            temp_path = store.get_plugin_cache_file(f"rvc_gpt_tts-{time.time()}.wav")
 
-            # 2. 下载音频 (流式写入)
-            async with httpx.AsyncClient(http2=True, follow_redirects=True, timeout=120) as client:
-                async with client.stream("GET", get_request_url) as response:
-                    response.raise_for_status()
-                    # 校验 Content-Length 如果有的话，防止空响
-                    async with aiofiles.open(temp_path, "wb") as f:
-                        async for chunk in response.aiter_bytes(chunk_size=262144):
-                            await f.write(chunk)
+        async with httpx.AsyncClient(http2=True, follow_redirects=True, timeout=120) as client:
+            async with client.stream("GET", get_request_url) as response:
+                response.raise_for_status()
+                # 校验 Content-Length 如果有的话，防止空响
+                async with aiofiles.open(temp_path, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=262144):
+                        await f.write(chunk)
 
-            # 3. 验证文件
-            if not temp_path.exists():
-                return None, "文件下载失败：未找到文件"
+        if not temp_path.exists():
+            return None, "文件下载失败：未找到文件"
 
-            stat = temp_path.stat()
-            if stat.st_size == 0:
-                return None, "文件下载失败：内容为空"
+        stat = temp_path.stat()
+        if stat.st_size == 0:
+            return None, "文件下载失败：内容为空"
 
-            # 4. 上传文件
-            try:
-                remote_path = await public_apis.upload_file(path=str(temp_path))
-            except Exception as e:
-                logger.exception("文件上传失败")
-                return None, "文件上传失败"
+        try:
+            remote_path = await public_apis.upload_file(path=str(temp_path))
+        except Exception as e:
+            logger.exception("文件上传失败")
+            return None, "文件上传失败"
 
-            if not remote_path:
-                return None, "文件上传失败"
+        if not remote_path:
+            return None, "文件上传失败"
 
-            # 5. 清理临时文件
-            try:
-                temp_path.unlink(missing_ok=True)
-            except Exception as e:
-                logger.warning(f"清理临时文件失败: {e}")
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"清理临时文件失败: {e}")
 
-            return remote_path, None
+        return remote_path, None
 
-        # 4. 统一的异常处理
     except httpx.HTTPStatusError as e:
         msg = f"API 返回错误: {e.response.status_code}"
         logger.error(msg)
         return None, msg
+
     except (httpx.RequestError, Exception) as e:  # 合并处理所有网络及其他异常
         logger.exception(f"下载过程异常: {e}")
         # 异常时尝试清理，避免残留
@@ -114,3 +109,47 @@ async def download_gpt_sovits_tts_file(get_request_url: str):
             except:
                 pass
         return None, f"请求异常: {str(e)}"
+
+
+async def wait_for_job(job):
+    """
+    在线程池中等待 job.result()，实现异步非阻塞等待
+    """
+    result = await asyncio.to_thread(job.result)  # 将阻塞调用放到线程中
+    return result
+
+
+async def qwen3_tts_customvoice(text: str):
+    await _bucket_qwen3_customvoice.acquire()
+
+    client = Client(config.qwen3_tts_customvoice_api_url, verbose=False)
+    job = client.submit(
+        text=text,
+        lang_disp=config.qwen3_tts_customvoice_lang_disp,
+        spk_disp=config.qwen3_tts_customvoice_spk_disp,
+        instruct=config.qwen3_tts_customvoice_instruct,
+        api_name="/run_instruct"
+    )
+    logger.debug(f"qwen3_tts_customvoice job started")
+    file_path, _ = await wait_for_job(job)
+    logger.debug(f"qwen3_tts_customvoice local {file_path}")
+    _remote_path = await public_apis.upload_file(file_path)
+    logger.debug(f"qwen3_tts_customvoice remote {_remote_path}")
+    return _remote_path
+
+
+async def qwen3_tts_voice_design(text: str):
+    await _bucket_qwen3_voice_design.acquire()
+    client = Client(config.qwen3_tts_voice_design_api_url, verbose=False)
+    job = client.submit(
+        text=text,
+        lang_disp=config.qwen3_tts_voice_design_lang_disp,
+        design=config.qwen3_tts_voice_design_design,
+        api_name="/run_voice_design",
+    )
+    logger.debug(f"qwen3_tts_voice_design job started")
+    file_path, _ = await wait_for_job(job)
+    logger.debug(f"qwen3_tts_voice_design local {file_path}")
+    _remote_path = await public_apis.upload_file(file_path)
+    logger.debug(f"qwen3_tts_voice_design remote {_remote_path}")
+    return _remote_path
