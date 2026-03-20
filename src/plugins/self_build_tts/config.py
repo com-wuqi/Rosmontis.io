@@ -9,6 +9,7 @@ class ScopedConfig(BaseModel):
     is_enable_gpt_sovits: bool = False
     is_enable_qwen3_customvoice: bool = False
     is_enable_qwen3_voice_design: bool = False
+    is_enable_qwen3_base: bool = False
 
     gpt_sovits_tts_api_url: str = ''
     gpt_sovits_ref_audio_path: str = ''
@@ -33,6 +34,10 @@ class ScopedConfig(BaseModel):
         'Portuguese', 'Spanish', 'Japanese', 'Korean',
         'French', 'Russian'] = "Auto"
     qwen3_tts_voice_design_design: str = ""
+
+    qwen3_tts_base_api_url: str = "http://localhost:8000"
+    # qwen3_tts_base_save_prompt_ref_aud: str = "" 机器人获取
+    qwen3_tts_base_use_xvec: bool = False  # 仅用说话人向量，效果有限，但不用传入参考音频文本
 
 class Config(BaseModel):
     """插件主配置,包含作用域"""

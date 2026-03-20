@@ -1,6 +1,7 @@
 from nonebot import on_command, logger
-from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, MessageSegment, Message
+from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent, MessageSegment, Message, Bot
 from nonebot.params import CommandArg
+from nonebot.typing import T_State
 
 from . import tts_api_handle, config
 
@@ -64,3 +65,30 @@ if config.is_enable_qwen3_voice_design:
         _res = await tts_api_handle.qwen3_tts_voice_design(text)
         _file = MessageSegment("file", {"file": f"file://{_res}"})
         await qwen3_customvoice.finish(_file)
+
+if config.is_enable_qwen3_base:
+    qwen3_clone = on_command("qwen3_clone")
+
+
+    @qwen3_clone.handle()
+    async def qwen3_clone_handle(event: MessageEvent, state: T_State):
+        if not isinstance(event, PrivateMessageEvent):
+            await qwen3_clone.finish("it is not a PrivateMessageEvent")
+        state["user_id"] = event.user_id
+        await qwen3_clone.send("非文件信息视为取消")
+
+
+    @qwen3_clone.got("ref_aud", prompt="上传参考音频")
+    async def qwen3_clone_got_ref_aud(bot: Bot, event: MessageEvent, state: T_State):
+        for segment in event.message:
+            if segment.type == "file":
+                logger.debug("file: {}".format(segment.data))
+                file_id = segment.data.get("file_id")  # 文件的唯一ID
+                file_name = segment.data.get("file")  # 文件名
+                file_size = segment.data.get("size")  # 文件大小 (字节)
+                msg_detail = await bot.call_api("get_msg", message_id=event.message_id)
+                logger.debug("msg_detail: {}".format(msg_detail))
+                logger.debug("file_id: {}".format(file_id))
+
+                await qwen3_clone.finish("debuging: getfile")
+        await qwen3_clone.finish("debuging: cancled")
