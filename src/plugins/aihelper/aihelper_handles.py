@@ -1,6 +1,8 @@
 import asyncio
+import time
 from typing import List, Dict
 
+import aiofiles
 from nonebot.log import logger
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessage
@@ -15,6 +17,12 @@ from nonebot import require
 
 require("src.plugins.mcp_support")
 from src.plugins.mcp_support import mcp_manger
+
+require("nonebot_plugin_localstore")
+import nonebot_plugin_localstore as store
+
+require("src.plugins.public_apis")
+import src.plugins.public_apis as public_api
 
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
@@ -157,3 +165,16 @@ async def get_all_comment_ids(session: AsyncSession) -> List[int]:
         id_list = list(result.scalars().all())
         return id_list
 
+
+async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: int) -> str:
+    # 保存信息到文件, 完成上传
+    temp_path = store.get_plugin_cache_file(f"{user_id}_{msg_type}_{time.time()}.txt.bak")
+    try:
+        async with aiofiles.open(temp_path, mode="w", encoding="utf-8") as f:
+            await f.write(_raw_msg)
+    except Exception as e:
+        logger.error(f"save_comments_to_file failed: {e}")
+        return ""
+
+    _remote_path = await public_api.upload_file(str(temp_path))
+    return _remote_path
