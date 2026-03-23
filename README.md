@@ -97,7 +97,7 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 ### 然后?
 
-然后就能用了, 还有问题可提 issue
+到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
 
 ## docker 手动构建
 
@@ -137,6 +137,10 @@ token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
 ```bash
 sudo docker logs -f rosbot # 检查是否连接成功
 ```
+
+### 然后?
+
+到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
 
 ## docker 使用构建产物
 

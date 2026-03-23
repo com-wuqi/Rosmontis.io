@@ -20,3 +20,31 @@
 ### 引入的依据
 
 [napcat doc](https://napneko.github.io/onebot/api#%E6%96%87%E4%BB%B6%E7%9B%B8%E5%85%B3)
+
+## get_cookies | get_clientkey
+
+## 调用
+
+参数: json 参考 `src/plugins/Qzone_toolkit/napcat_websockets_api.py`
+
+期望的返回值: dict 参考 `src/plugins/Qzone_toolkit/napcat_websockets_api.py`
+
+### 受到影响的内容
+
+`src/plugins/Qzone_toolkit/napcat_websockets_api.py`
+
+整个文件
+
+插件 `src/plugins/Qzone_toolkit`
+
+整个插件
+
+插件 `src/plugins/qzone_handle`
+
+作为下游, 依赖于这个插件
+
+### 引入的依据
+
+[napcat doc](https://napneko.github.io/onebot/api#%E8%B4%A6%E5%8F%B7%E7%9B%B8%E5%85%B3)
+
+[napcat doc](https://napneko.github.io/onebot/api#%E5%85%B6%E4%BB%96%E5%8A%9F%E8%83%BD)
