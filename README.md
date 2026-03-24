@@ -205,6 +205,10 @@ https://github.com/sansenjian/quick-e2b-sandbox
 
 [compare_env.py](compare_env.py) : 比较配置文件的环境变量条目是否相同
 
+## Tip
+
+`src/plugins/aihelper/md_prompts` 里面所有的markdown文件都会作为AI提示词
+
 ## 许可证
 
 本项目采用 [MIT 许可证](LICENSE) 进行许可。
