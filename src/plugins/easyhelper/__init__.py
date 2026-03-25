@@ -15,8 +15,6 @@ __plugin_meta__ = PluginMetadata(
 
 config = get_plugin_config(Config)
 
-# TODO: 暂时不上传, 等待其他插件完工才能补全帮助文件
-
 request_help = on_command("get-help")
 
 
