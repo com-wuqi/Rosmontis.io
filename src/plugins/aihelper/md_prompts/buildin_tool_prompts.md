@@ -2,11 +2,9 @@
 
 **任何** 需要获取时间的时候, 调用 `ros_get_current_time`,
 **仅当** 用户需要了解最新信息或者明确要求搜索时候, 调用 `ros_call_web_search`
-**当** 有些问题需要执行python代码解决时, 调用 `ros_run_code_in_e2b`
+**当** 有些问题需要执行python代码解决时, 调用 `ros_run_code_in_e2b` ，获取文件仅需要获取url提交给用户
 
 工具调用可能因各种原因随时失败（如服务不可用），请始终做好失败处理
-"""
-server_filesystem_tool_prompts = """
 
 # 文件系统
 

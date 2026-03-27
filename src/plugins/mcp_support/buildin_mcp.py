@@ -17,6 +17,32 @@ for dir_1 in dir_list:
 _user_sandboxs: Dict[int, Any | None] = {}
 _sandbox_locks: Dict[int, asyncio.Lock] = {}
 
+_e2b_init_code = """
+import os
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+def _configure_font():
+    font_path = '/tmp/SimHei.ttf'
+    if not os.path.exists(font_path):
+        try:
+            # 使用 -s 参数静默下载，避免进度信息污染 stderr
+            os.system('curl -s -L -o /tmp/SimHei.ttf https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf')
+        except: pass
+
+    if os.path.exists(font_path):
+        try:
+            fm.fontManager.addfont(font_path)
+            plt.rcParams['font.sans-serif'] = ['SimHei']
+            plt.rcParams['axes.unicode_minus'] = False
+        except: pass
+
+try:
+    _configure_font()
+except: pass
+"""
 
 def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     """获取或创建指定 sandbox 的锁"""
@@ -25,7 +51,7 @@ def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     return _sandbox_locks[user_id]
 
 
-async def get_sandbox(user_id: int, timeout: int) -> Any | None | str:
+async def get_sandbox(user_id: int, timeout: int = 86_400) -> Any | None | str:
     if user_id in _user_sandboxs:
         sbx_info = await _user_sandboxs[user_id].get_info()
         if sbx_info.state in [SandboxState.PAUSED, SandboxState.RUNNING]:
@@ -124,13 +150,14 @@ async def call_web_search(
                 return {"error": f"请求异常: {str(e)}"}
 
 
-async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], timeout: int = 120):
+async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], timeout: int = 300):
     """
-    通过单次调用来执行 Python 代码, 使用 print 获得返回值
+    通过单次调用来执行 Python 代码, 使用 print 获得返回值,
+    生成的文件不可直接打开，保存并 获取目录（print），然后获取 url
     :param user_id: int, 在信息的第一个冒号前提供, 按原样传递
     :param code: 单次调用所需要执行的代码
     :param requirements: 每次都需要安装, 运行代码需要安装的包列表，例如 [\"numpy\", \"pandas\"]
-    :param timeout: 容器的有效期, 单位秒, 最长3600秒, 默认120秒
+    :param timeout: 容器的有效期, 单位秒, 最长3600秒, 默认300秒
     :return: {"stdout":stdout, "stderr":stderr} | {"fail":msg}
     """
     bucket_e2b = get_bucket_e2b()
@@ -150,9 +177,29 @@ async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], time
                 cmds = f"pip install {' '.join(requirements)}"
                 await sandbox.commands.run(cmds, timeout=timeout)
 
-            exec_codes = await sandbox.run_code(code)
+            _codes = _e2b_init_code + "\n" + code
+            exec_codes = await sandbox.run_code(_codes)
             return {"stdout": exec_codes.logs.stdout, "stderr": exec_codes.logs.stderr}
 
+
+async def e2b_get_file(user_id: int, path: str, file_timeout: int = 120):
+    """
+    根据 user_id 和 目录， 从E2B沙箱获取文件 url
+    :param file_timeout: 链接有效期， 默认 120 秒
+    :param user_id: int, 在信息的第一个冒号前提供, 按原样传递
+    :param path: str, 文件的path
+    :return: 文件 url
+    """
+    bucket_e2b = get_bucket_e2b()
+    semaphore_e2b = get_semaphore_e2b()
+
+    await bucket_e2b.acquire()
+    async with semaphore_e2b:
+        _lock = get_sandbox_lock(user_id=user_id)
+        async with _lock:
+            sandbox = await get_sandbox(user_id=user_id)
+            signed_url = sandbox.download_url(path=path, use_signature_expiration=file_timeout)
+            return signed_url
 
 if __name__ == "__main__":
     try:
@@ -171,6 +218,7 @@ if __name__ == "__main__":
         if is_enable_run_code_in_e2b == "true":
             if env_dict.get("E2B_API_KEY"):
                 mcp.add_tool(run_code_in_e2b)
+                mcp.add_tool(e2b_get_file)
             else:
                 pass
 
