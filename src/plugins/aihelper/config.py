@@ -4,7 +4,7 @@ from pydantic import BaseModel
 class ScopedConfig(BaseModel):
     """Plugin Config Here"""
     is_enable: bool
-    tools_max_once_calls: int
+    tools_max_once_calls: int = 20
     is_enable_tool_prompt: bool = True
 
 

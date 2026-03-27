@@ -1,6 +1,8 @@
 import asyncio
+import time
 from typing import List, Dict
 
+import aiofiles
 from nonebot.log import logger
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessage
@@ -15,6 +17,12 @@ from nonebot import require
 
 require("src.plugins.mcp_support")
 from src.plugins.mcp_support import mcp_manger
+
+require("nonebot_plugin_localstore")
+import nonebot_plugin_localstore as store
+
+require("src.plugins.public_apis")
+import src.plugins.public_apis as public_api
 
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
@@ -36,7 +44,7 @@ async def get_model_names(key:str,url:str) -> List[str]:
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
         tools = mcp_manger.all_tools if mcp_manger is not None else []
-        client = AsyncOpenAI(base_url=url,api_key=key,timeout=60)
+        client = AsyncOpenAI(base_url=url, api_key=key, timeout=180)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
@@ -88,6 +96,7 @@ async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: Asy
 
 
 async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: bool, user_id: int) -> int:
+    # 修改 config_id 的 is_enable 为 bool(target)
     async with semaphore_sql:
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == user_id)
         result = await session.execute(smt)
@@ -98,6 +107,27 @@ async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: 
         session.add(data)
         await session.commit()
         return 0
+
+
+async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id: int) -> int | dict:
+    # 将 用户 user_id 的 配置文件 config_id 修改为 True , 其他为 false
+    async with semaphore_sql:
+        smt = select(Settings).where(Settings.user_id == user_id)
+        result = await session.execute(smt)
+        data = result.scalars().all()
+        if data is None:
+            return -1
+        _changed_to_true, _changed_to_false = 0, 0
+        for item in data:
+            if item.id == config_id:
+                item.is_enabled = True
+                _changed_to_true += 1
+            else:
+                _changed_to_false += 1
+                item.is_enabled = False
+        # session.add(data)
+        await session.commit()
+        return {"_changed_to_true": _changed_to_true, "_changed_to_false": _changed_to_false}
 
 
 async def get_comments_by_id(sid: int, session: AsyncSession):
@@ -135,3 +165,16 @@ async def get_all_comment_ids(session: AsyncSession) -> List[int]:
         id_list = list(result.scalars().all())
         return id_list
 
+
+async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: int) -> str:
+    # 保存信息到文件, 完成上传
+    temp_path = store.get_plugin_cache_file(f"{user_id}_{msg_type}_{time.time()}.txt.bak")
+    try:
+        async with aiofiles.open(temp_path, mode="w", encoding="utf-8") as f:
+            await f.write(_raw_msg)
+    except Exception as e:
+        logger.error(f"save_comments_to_file failed: {e}")
+        return ""
+
+    _remote_path = await public_api.upload_file(str(temp_path))
+    return _remote_path

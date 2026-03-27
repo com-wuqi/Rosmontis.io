@@ -12,11 +12,31 @@
 
 由于我们更新的提示词的添加, 您可能不得不执行 `ai remove` 并按照提示完成删除数据库内对话才能正常使用
 
+## 兼容性警告
+
+> 请注意, OneBot 是一个已经脱轨且停滞的协议规范, 对 **大部分** 框架本身没有实质性约束。
+
+我们尽量遵守了大部分 OneBot 规范。在遇到无法实现或需要扩展的场景时, 会根据 **目前可用** 的信息提供方进行差异化实现,
+因此存在过时风险
+
+请参阅 [Compatibility_Warning.md](Compatibility_Warning.md)
+
+请允许 我 [@com-wuqi](https://github.com/com-wuqi) 再次 "悼念" `go-cqhttp` 项目,
+这里引用一段评论, 来自: [go-cqhttp #2471](https://github.com/Mrs4s/go-cqhttp/issues/2471)
+
+> go-cqhttp 项目标志着 QQ 机器人的一个时代。
+>
+> 我有幸亲眼见证了 go-cqhttp 从诞生到发展的所有历史节点。go-cqhttp 诞生时 CoolQ 还没有退场，那个时候机器人圈闭源横行。
+> 是 go-cqhttp (和 mirai) 推动了整个社区的开源化，并孵化出欣欣向荣的众多框架。
+> 作为一位开源开发者，我由衷的感谢 go-cqhttp 的每一位开发者为生态做出的贡献。
+>
+> 这些年辛苦了。
+
 ## 手动部署 (推荐)
 
 ### 准备环境
 
-上游实现: 本项目依赖 onebotv11 , 理论上任何支持 onebotv11 的信息提供方都可以接入
+本项目依赖 onebotv11 , 理论上任何支持 onebotv11 的信息提供方都可以接入
 
 ai相关: openai标准库实现, 支持自定义 MCP 服务 (支持sse, stdio, streamable-http)
 
@@ -36,6 +56,8 @@ MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
 ```bash
 pip install -r requirements.txt
 ```
+
+如果需要使用自建TTS支持, 然后执行 `pip install gradio_client`
 
 使用 `nb plugin` 更新所需插件
 
@@ -75,9 +97,11 @@ nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
 
 ### 然后?
 
-然后就能用了, 还有问题可提 issue
+到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
 
 ## docker 手动构建
+
+*不支持自建TTS和一部分MCP服务器*
 
 克隆仓库, 进入目录,
 
@@ -113,6 +137,10 @@ token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
 ```bash
 sudo docker logs -f rosbot # 检查是否连接成功
 ```
+
+### 然后?
+
+到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
 
 ## docker 使用构建产物
 
@@ -169,9 +197,17 @@ https://github.com/gfhdhytghd/qzone-toolkit
 
 https://github.com/sansenjian/quick-e2b-sandbox
 
+## 自建TTS支持 (实验性功能, 不稳定)
+
+[TTS_Support.md](TTS_Support.md)
+
 ## 小工具
 
 [compare_env.py](compare_env.py) : 比较配置文件的环境变量条目是否相同
+
+## Tip
+
+`src/plugins/aihelper/md_prompts` 里面所有的markdown文件都会作为AI提示词
 
 ## 许可证
 

@@ -19,7 +19,7 @@ _bucket_qq_music = TokenBucket(rate=20, capacity=20)
 _bucket_kuwo_music = TokenBucket(rate=2, capacity=20)
 _bucket_apple_music = TokenBucket(rate=15 / 20, capacity=15)
 
-_semaphore_music = asyncio.Semaphore(60)
+_semaphore_music = asyncio.Semaphore(30)
 _file_extension: dict = {
     "wyvip": {"standard": "mp3", "exhigh": "mp3", "lossless": "flac", "jyeffect": "flac", "sky": "flac",
               "jymaster": "flac"},

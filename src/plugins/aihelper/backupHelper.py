@@ -1,11 +1,8 @@
-import time
-from base64 import b64encode
-
 from nonebot import on_command
 from nonebot import require
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Bot, MessageSegment
 
-from .aihelper_handles import get_comments_by_id
+from .aihelper_handles import get_comments_by_id, save_comments_to_file
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
@@ -26,26 +23,23 @@ async def backup_comments_handle(bot: Bot, event: MessageEvent, session: async_s
     # 备份的数据就是 json 字符串, 还原只需要原样放回去应该就行
     if isinstance(event, GroupMessageEvent):
         _session_type = "group"
+        _user_id = event.group_id
         _res = await get_comments_by_id(sid=event.group_id, session=session)
     else:
         _session_type = "user"
+        _user_id = event.user_id
         _res = await get_comments_by_id(sid=event.user_id, session=session)
 
     if _res is not None and _res.message:
-        try:
-            encoded = b64encode(_res.message.encode()).decode('utf-8')
-        except:
-            await backup_comments.finish("failed")
-            return
-        if _session_type == "group":
-            _file = MessageSegment("file", {"file": f"base64://{encoded}",
-                                            "name": f"backup-{time.time()}-{event.group_id}.bak"})
-        else:
-            _file = MessageSegment("file",
-                                   {"file": f"base64://{encoded}", "name": f"backup-{time.time()}-{event.user_id}.bak"})
+
+        _remote_path = await save_comments_to_file(_raw_msg=_res.message, msg_type=_session_type, user_id=_user_id)
+        if _remote_path == "":
+            await backup_comments.finish("fail")
+
+        _file = MessageSegment("file", {"file": f"file://{_remote_path}"})
         await backup_comments.finish(_file)
     else:
-        await backup_comments.finish("failed")
+        await backup_comments.finish("is empty")
 
 
 @restore_comments.handle()

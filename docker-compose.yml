@@ -16,6 +16,7 @@ services:
       - SQLALCHEMY_DATABASE_URL=mysql+aiomysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data
       - ONEBOT_WS_URLS=["ws://napcat:3001/onebot/v11/ws"]
       - PUBLICAPI__UPLOAD_WS_URL=ws://napcat:3001
+      - QZONE_API__WS_URL=ws://napcat:3001
       - APSCHEDULER_CONFIG={"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"mysql+pymysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data","tablename":"apscheduler_jobs"}}}
 
     volumes:
@@ -64,7 +65,7 @@ services:
       # 容器内运行的用户 ID，通常保持 0（root）避免权限问题
       - NAPCAT_UID=${NAPCAT_UID:-0}
       - NAPCAT_GID=${NAPCAT_GID:-0}
-      # 【必填】机器人的 QQ 账号
+      # 机器人的 QQ 账号
       - ACCOUNT=${DOCKER_QQ_ACCOUNT:-1}
       # 可选：设置 WebUI 的访问令牌，如果不设置，系统会随机生成一个并在日志中打印
       - WEBUI_TOKEN=${NAPWEBUI_TOKEN:-}

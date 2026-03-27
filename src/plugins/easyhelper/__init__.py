@@ -15,8 +15,6 @@ __plugin_meta__ = PluginMetadata(
 
 config = get_plugin_config(Config)
 
-# TODO: 暂时不上传, 等待其他插件完工才能补全帮助文件
-
 request_help = on_command("get-help")
 
 
@@ -41,14 +39,16 @@ async def request_help_handle(args: Message = CommandArg()):
     ai cf delete -- 删除配置(暂不实现)
     ai cf edit -- 编辑配置(暂不实现)
     ai cf switch [config_id:int] [switch:int] -- 启用/禁用配置:0/1
+    ai cf choose [config_id:int] -- 选择配置, 禁用其他
     ai load -- 启动AI
     system [提示词] -- 添加 system 提示词(对话进行时+权限要求)
     ai save -- 退出AI
     ai remove -- 删除数据库中的对话
     ai zp mm -- 压缩内存中缓存的对话
-    ai zp db -- 压缩数据库中的对话""",
+    ai zp db -- 压缩数据库中的对话
+    """,
         "ai-other": """
-    tts [角色] [内容] -- 语音合成(当前仅支持中文)
+    yaohud-tts [角色] [内容] -- 妖狐数据 语音合成(当前仅支持中文)
     支持的角色: 原神: 希格雯/神里绫华/胡桃/可莉/芙宁娜
     星穹铁道: 阮梅
     明日方舟: 多萝西
@@ -71,6 +71,7 @@ async def request_help_handle(args: Message = CommandArg()):
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
     mcp_status -- MCP 服务状态
+    qzone txt [文本1] [文本2]... --- (不同文本换行)发动态,需要 SUPERUSERS
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

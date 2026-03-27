@@ -17,6 +17,7 @@ show_config = on_command("ai cf show")  # 列出用户配置
 delete_config = on_command("ai cf delete")  # 删除用户配置, 暂时不实现
 edit_config = on_command("ai cf edit")  # 编辑用户配置
 switch_config = on_command("ai cf switch")
+choose_config = on_command("ai cf choose")  # 选择配置文件
 
 
 # 切换用户配置, 本质上是修改一个值, 用法 [sign]ai cf switch [config_id] bool([switch_int])
@@ -24,6 +25,24 @@ switch_config = on_command("ai cf switch")
 @edit_config.handle()
 async def edit_config_handle():
     await edit_config.finish("不计划实现, 推荐删除配置后新建")
+
+
+@choose_config.handle()
+async def choose_config_handle(event: MessageEvent, session: async_scoped_session, config_id: Message = CommandArg()):
+    if isinstance(event, GroupMessageEvent):
+        await choose_config.finish("处于安全考虑, 这个操作不允许在群聊中进行")
+    _config_id = config_id.extract_plain_text().strip()
+    if not _config_id.isdigit():
+        await choose_config.finish("config_id 需要是纯数字")
+    # if int(_config_id) == 1
+    _res = await change_is_enable_by_id(config_id=int(_config_id), session=session, user_id=event.user_id)
+    if _res == -1:
+        await choose_config.finish("fail")
+    else:
+        await choose_config.finish(
+            f"总计命中: {_res["_changed_to_true"] + _res["_changed_to_false"]}\n"
+            f"set :\nTrue: {_res["_changed_to_true"]} ,False: {_res["_changed_to_false"]}"
+        )
 
 @show_config.handle()
 async def show_config_handle(event: MessageEvent,session: async_scoped_session):
