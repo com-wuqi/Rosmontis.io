@@ -223,7 +223,7 @@ if __name__ == "__main__":
                 pass
 
         mcp.run(transport="stdio")
-    except KeyboardInterrupt | Exception as e:
+    except (KeyboardInterrupt, Exception) as e:
         for sbx in _user_sandboxs.values():
             try:
                 sbx.close()

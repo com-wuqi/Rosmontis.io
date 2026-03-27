@@ -64,7 +64,7 @@ if config.is_enable_qwen3_voice_design:
             await qwen3_voice_design.finish("qwen3_voice_design 需要文本")
         _res = await tts_api_handle.qwen3_tts_voice_design(text)
         _file = MessageSegment("file", {"file": f"file://{_res}"})
-        await qwen3_customvoice.finish(_file)
+        await qwen3_voice_design.finish(_file)
 
 if config.is_enable_qwen3_base:
     # 很奇怪的问题: 在使用 got 的信息中, CommandArg 似乎有问题,
@@ -132,9 +132,9 @@ if config.is_enable_qwen3_base:
     @qwen3_generate.handle()
     async def qwen3_gen_handle(event: MessageEvent, state: T_State):
         if not isinstance(event, PrivateMessageEvent):
-            await qwen3_clone.finish("it is not a PrivateMessageEvent")
+            await qwen3_generate.finish("it is not a PrivateMessageEvent")
         state["user_id"] = event.user_id
-        await qwen3_clone.send("非文件信息视为取消")
+        await qwen3_generate.send("非文件信息视为取消")
 
 
     @qwen3_generate.got("file_obj", prompt="模型文件?")
@@ -166,12 +166,12 @@ if config.is_enable_qwen3_base:
     @qwen3_generate.got("confirm", prompt="是否确定? y/n")
     async def qwen3_gen_confirm(state: T_State, arg: Message = Arg("confirm")):
         if arg.extract_plain_text().strip() not in ["y", "n"]:
-            await qwen3_clone.reject("输入需要是 y 或者 n")
+            await qwen3_generate.reject("输入需要是 y 或者 n")
         if arg.extract_plain_text().strip() == "n":
-            await qwen3_clone.finish("canceled")
+            await qwen3_generate.finish("canceled")
         _res = await tts_api_handle.qwen3_tts_base_gen(
             file_path=state["file_obj"],
             text=state["qwen3_gen_text"],
         )
         _file = MessageSegment("file", {"file": f"file://{_res}"})
-        await qwen3_clone.finish(_file)
+        await qwen3_generate.finish(_file)
