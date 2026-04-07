@@ -276,9 +276,13 @@ async def ai_chat_handle(event: MessageEvent):
                     _raw_message.append(
                         {"tool_call_id": tool_call.id, "role": "tool", "content": "fail: invalid arguments"})
                     continue
+
                 try:
                     logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
-                    _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
+                    if function_name in checked_hooked_mcp_tools.keys():
+                        _result = await checked_hooked_mcp_tools[function_name](**function_args)
+                    else:
+                        _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
                     logger.debug(f"MCP : function_name:{function_name} function_result:{_result}")
                     _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
                 except Exception as e:

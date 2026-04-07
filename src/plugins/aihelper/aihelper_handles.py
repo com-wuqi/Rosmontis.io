@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Callable
 from typing import List, Dict
 
 import aiofiles
@@ -23,6 +24,18 @@ import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
 import src.plugins.public_apis as public_api
+
+require("src.plugins.hooked_mcp_tools")
+import src.plugins.hooked_mcp_tools as hooked_mcp_tools
+
+checked_hooked_mcp_tools: Dict[str, Callable] = {}
+for _key in hooked_mcp_tools.hooked_functions.keys():
+    _func = hooked_mcp_tools.hooked_functions[_key]
+    if callable(_func):
+        checked_hooked_mcp_tools[_key] = _func
+    else:
+        logger.warning(f"hooked_mcp_tools key:{_key} ,function is not callable")
+hooked_tools = hooked_mcp_tools.hooked_tools
 
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
@@ -48,7 +61,7 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,m
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
-            tools=tools,
+            tools=tools + hooked_tools,
             temperature=temperature
         )
         return chat_completion.choices[0].message
