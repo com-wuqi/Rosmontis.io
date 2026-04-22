@@ -34,6 +34,11 @@ zip_db_ai = on_command("ai zp db",priority=80,block=False)
 ai_chat = on_message(priority=8, block=False)
 # 处理非命令消息
 
+_debug_message = on_message(priority=1, block=False)
+
+
+# 捕获所有信息，备用|调试用途
+
 def get_session_lock(session_id: int) -> asyncio.Lock:
     """获取或创建指定会话的锁"""
     if session_id not in _locks:
@@ -375,6 +380,13 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
             await zip_db_ai.finish("zip_db_ai. success")
         else:
             await zip_db_ai.finish("db is empty, finished")
+
+
+@_debug_message.handle()
+async def debug_message_handle(event: MessageEvent):
+    # logger.debug("MessageEvent.message_type: {}".format(event.message_type))
+    logger.debug("MessageEvent.raw_message: {}".format(event.raw_message))
+    return
 
 # # 自动压缩逻辑(内存中, 缺少测试)
 # @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")

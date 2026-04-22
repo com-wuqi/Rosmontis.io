@@ -21,15 +21,14 @@ async def hooked_mcp_test():
 
 
 hooked_functions: Dict[str, Callable] = {"hooked_mcp_test": hooked_mcp_test}  # 工具名称:函数
-hooked_tools: List[Dict[str, str | Dict[str, str | Dict[str, str | Dict[str, Any]]]]] = []
-hooked_tools.append({
+hooked_tools: List[Dict[str, str | Dict[str, str | Dict[str, str | Dict[str, Any]]]]] = [{
     "type": "function",
     "function": {
         "name": "hooked_mcp_test",
         "description": f"测试 基于插件的mcp",
         "parameters": {}
     }
-})
+}]
 # [{
 #     "type": "function",
 #     "function": {

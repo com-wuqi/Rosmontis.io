@@ -130,6 +130,8 @@ Host: 0.0.0.0 ,
 
 Port: 3001 ,
 
+心跳间隔：10000 （不修改可能导致反复连接超时）
+
 选择启用 ,
 
 token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
