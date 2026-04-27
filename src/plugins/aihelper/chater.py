@@ -1,16 +1,19 @@
 import json
+import re
 
 from nonebot import get_driver, require
 from nonebot import on_command, on_message
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent
 from nonebot.internal.params import ArgPlainText
 
+from .system_prompts import tool_system_prompts_list
+
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
 from . import config
-require("nonebot_plugin_apscheduler")
+# require("nonebot_plugin_apscheduler")
 from .aihelper_handles import *
-from .system_prompts import tool_system_prompts_list
+
 _Messages_dicts = {}
 # 这里应该是 {comments_id : Messages} 这里的id用于区分不同用户
 # 这个池子存储所有用户的所有对话信息
@@ -34,10 +37,15 @@ zip_db_ai = on_command("ai zp db",priority=80,block=False)
 ai_chat = on_message(priority=8, block=False)
 # 处理非命令消息
 
-_debug_message = on_message(priority=1, block=False)
-
-
+# _debug_message = on_message(priority=1, block=False)
 # 捕获所有信息，备用|调试用途
+
+def is_valid_cq_code(s: str) -> bool:
+    """
+    判断字符串是否为合规的 CQ 码
+    """
+    pattern = r"\[CQ:(?P<type>[a-zA-Z0-9-_.]+)" + r"(?P<params>" + r"(?:,[a-zA-Z0-9-_.]+=[^,\]]*)*" + r"),?\]"
+    return bool(re.fullmatch(pattern, s.strip()))
 
 def get_session_lock(session_id: int) -> asyncio.Lock:
     """获取或创建指定会话的锁"""
@@ -214,6 +222,13 @@ async def ai_chat_handle(event: MessageEvent):
     msg = str(event.get_message()).strip()
     if not msg:
         return
+
+    if is_valid_cq_code(msg):
+        logger.debug("is_valid_cq_code matched, is it a file ?")
+        for segment in event.message:
+            logger.debug("segment.data : {}".format(segment.data))
+        msg = "暂不支持的信息类型"
+
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写
         try:
@@ -381,12 +396,11 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
         else:
             await zip_db_ai.finish("db is empty, finished")
 
-
-@_debug_message.handle()
-async def debug_message_handle(event: MessageEvent):
-    # logger.debug("MessageEvent.message_type: {}".format(event.message_type))
-    logger.debug("MessageEvent.raw_message: {}".format(event.raw_message))
-    return
+# @_debug_message.handle()
+# async def debug_message_handle(event: MessageEvent):
+#     # logger.debug("MessageEvent.message_type: {}".format(event.message_type))
+#     logger.debug("MessageEvent.raw_message: {}".format(event.raw_message))
+#     return
 
 # # 自动压缩逻辑(内存中, 缺少测试)
 # @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")

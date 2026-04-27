@@ -28,6 +28,11 @@ import src.plugins.public_apis as public_api
 require("src.plugins.hooked_mcp_tools")
 import src.plugins.hooked_mcp_tools as hooked_mcp_tools
 
+require("src.plugins.ai_file_reader")
+import src.plugins.ai_file_reader as ai_file
+
+ai_file_reader = ai_file.ai_file_reader
+
 checked_hooked_mcp_tools: Dict[str, Callable] = {}
 for _key in hooked_mcp_tools.hooked_functions.keys():
     _func = hooked_mcp_tools.hooked_functions[_key]
