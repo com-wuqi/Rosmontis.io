@@ -211,6 +211,10 @@ https://github.com/sansenjian/quick-e2b-sandbox
 
 `src/plugins/aihelper/md_prompts` 里面所有的markdown文件都会作为AI提示词
 
+`requirements.txt` 内部包含了这个文件的生成方式
+
+`pip install --upgrade -r requirements.txt` 可以根据 `requirements.txt` 更新依赖
+
 ## 许可证
 
 本项目采用 [MIT 许可证](LICENSE) 进行许可。

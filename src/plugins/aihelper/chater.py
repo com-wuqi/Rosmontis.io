@@ -3,7 +3,7 @@ import re
 
 from nonebot import get_driver, require
 from nonebot import on_command, on_message
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent, Bot
 from nonebot.internal.params import ArgPlainText
 
 from .system_prompts import tool_system_prompts_list
@@ -215,7 +215,7 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
 
 
 @ai_chat.handle()
-async def ai_chat_handle(event: MessageEvent):
+async def ai_chat_handle(event: MessageEvent, bot: Bot):
     session_id,session_type = get_comments_id(event)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复

@@ -8,7 +8,12 @@ class ScopedConfig(BaseModel):
     image_ai_api_url: str = ""
     image_ai_api_key: str = ""
     image_ai_model_name: str = ""
-    image_ai_rate_limit: int = 10  # 每分钟可以读取的图片数目
+    image_ai_rate_limit: int = 10  # 每秒钟可以读取的图片数目
+    image_zip_quality: int = 85  # 质量 用于有损格式 (JPEG/WebP)
+    image_zip_lossless: bool = False  # PNG/WebP 无损模式
+    # 等比缩放，使用一个参数即可
+    max_width: int = None  # 等比缩放，最大宽度
+    max_height: int = None  # 等比缩放，最大高度
 
 
 class Config(BaseModel):

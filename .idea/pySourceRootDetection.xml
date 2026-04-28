@@ -4,6 +4,7 @@
     <option name="sourcePathsSet">
       <set>
         <option value="$PROJECT_DIR$/src/plugins" />
+        <option value="$PROJECT_DIR$" />
       </set>
     </option>
   </component>
