@@ -13,7 +13,7 @@ aiofiles==25.1.0
     #   nonebot-plugin-htmlrender
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.13.3
+aiohttp==3.13.4
     # via -r requirements.txt
 aiomysql==0.3.2
     # via -r requirements.txt
@@ -74,7 +74,7 @@ click==8.3.3
     #   typer
     #   typer-slim
     #   uvicorn
-cryptography==46.0.5
+cryptography==46.0.7
     # via
     #   -r requirements.txt
     #   pyjwt
@@ -268,7 +268,7 @@ pysocks==1.7.1
     # via -r requirements.txt
 python-dateutil==2.9.0.post0
     # via e2b
-python-dotenv==1.2.1
+python-dotenv==1.2.2
     # via
     #   -r requirements.txt
     #   nonebot2
@@ -276,7 +276,7 @@ python-dotenv==1.2.1
     #   uvicorn
 python-markdown-math==0.9
     # via nonebot-plugin-htmlrender
-python-multipart==0.0.22
+python-multipart==0.0.26
     # via
     #   -r requirements.txt
     #   mcp
