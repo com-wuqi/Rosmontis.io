@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import functools
+import mimetypes
 import os
 import re
 import time
@@ -7,6 +9,7 @@ import time
 from PIL import Image
 from nonebot import require
 from nonebot.log import logger
+from openai import AsyncOpenAI
 
 from . import config
 
@@ -31,10 +34,10 @@ def is_supported_image(s: str) -> bool:
 def compress_image(
         input_path: str,
         output_path: str,
-        quality: int = 85,  # 用于有损格式 (JPEG/WebP)
-        lossless: bool = False,  # PNG/WebP 无损模式
-        max_width: int = None,  # 限制最大宽度（等比缩放）
-        max_height: int = None,
+        quality: int = config.image_zip_quality,  # 用于有损格式 (JPEG/WebP)
+        lossless: bool = config.image_zip_lossless,  # PNG/WebP 无损模式
+        max_width: int = config.image_zip_max_width,  # 限制最大宽度（等比缩放）
+        max_height: int = config.image_zip_max_height,  # 限制最大高度（等比缩放）
 ):
     """
     压缩图片
@@ -85,6 +88,18 @@ def compress_image(
     logger.debug(f"compress_image success：{original_size // 1024}KB -> {compressed_size // 1024}KB ")
 
 
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+async def encode_image_async(image_path):
+    loop = asyncio.get_event_loop()
+    func = functools.partial(encode_image, image_path)
+    result = await loop.run_in_executor(None, func)
+    return result
+
+
 async def compress_image_async(input_path, output_path, **kwargs):
     loop = asyncio.get_running_loop()
     func = functools.partial(compress_image, input_path, output_path, **kwargs)
@@ -97,14 +112,45 @@ async def read_image(file_name: str, file_url: str) -> str | None:
     image_path = store.get_plugin_cache_file(f"{time.time()}-{file_name}")
     compressed_image_path = store.get_plugin_cache_file(f"compressed-{time.time()}-{file_name}")
     _return = None
+    mime_type, _ = mimetypes.guess_type(file_name)
     try:
+        assert mime_type is not None, "guess type error"
+        # 图片下载，压缩
         _try_download = await download_file(file_url, str(image_path))
         assert _try_download == 0, "download failed"
         await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))
+        assert os.path.exists(str(compressed_image_path)), "compress failed"
+        base64_image = await encode_image_async(str(compressed_image_path))
+        client = AsyncOpenAI(base_url=config.image_ai_api_url, api_key=config.image_ai_api_key,
+                             timeout=config.image_ai_api_timeout)
+        chat_completion = await client.chat.completions.create(
+            model=config.image_ai_model_name,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "请准确，详细，客观的描述图片里的所有内容"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{base64_image}",
+                                "detail": "auto"
+                            }
+                        }
+                    ]
+
+                }
+            ],
+            temperature=1.0
+        )
+        _return = chat_completion.choices[0].message
+        # logger.debug(f"read_image: {_return.content}")
+        return _return.content
+
     except Exception as e:
         logger.error(e)
     finally:
         image_path.unlink(missing_ok=True)
         compressed_image_path.unlink(missing_ok=True)
 
-    return _return
+    return str(_return)

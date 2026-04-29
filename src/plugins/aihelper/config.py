@@ -6,6 +6,7 @@ class ScopedConfig(BaseModel):
     is_enable: bool
     tools_max_once_calls: int = 20
     is_enable_tool_prompt: bool = True
+    api_timeout: int = 300  # api 超时限制
 
 
 class Config(BaseModel):

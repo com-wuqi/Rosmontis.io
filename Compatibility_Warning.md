@@ -14,8 +14,12 @@
 
 `src/plugins/self_build_tts/message_handle.py`
 
-1. function : qwen3_clone_got_ref_aud bot.call_api调用
-2. function : qwen3_gen_got_file_obj bot.call_api调用
+1. 函数 `qwen3_clone_got_ref_aud` 通过 `bot.call_api` 调用
+2. 函数 `qwen3_gen_got_file_obj` 通过 `bot.call_api` 调用
+
+`src/plugins/ai_file_reader/__init__.py`
+
+1. 函数 `ai_file_reader` 通过 `bot.call_api` 调用
 
 ### 引入的依据
 

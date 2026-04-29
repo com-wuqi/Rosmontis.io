@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select
 
+from . import config
 from .models import *
 
 require("nonebot_plugin_orm")
@@ -62,7 +63,7 @@ async def get_model_names(key:str,url:str) -> List[str]:
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
         tools = mcp_manger.all_tools if mcp_manger is not None else []
-        client = AsyncOpenAI(base_url=url, api_key=key, timeout=180)
+        client = AsyncOpenAI(base_url=url, api_key=key, timeout=config.api_timeout)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,

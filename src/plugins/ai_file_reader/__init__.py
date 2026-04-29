@@ -1,4 +1,4 @@
-from typing import Dict, Callable
+from typing import List, Dict, Callable
 
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot
@@ -22,6 +22,9 @@ from .image_reader import *
 message_matcher: Dict[Callable, Callable] = {
     is_supported_image: read_image
 }
+message_matcher_switch: List[bool] = [
+    config.is_enable_image
+]
 
 
 async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
@@ -47,8 +50,8 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
         if (file_url is None) or (file_name is None):
             return result_msg
 
-    for key, value in message_matcher.items():
-        if key(file_name):
+    for index, (key, value) in enumerate(message_matcher.items()):
+        if key(file_name) and message_matcher_switch[index]:  # 根据索引判断开关状态
             _result_msg = await value(file_name, file_url)
             result_msg = _result_msg if _result_msg else result_msg
             break
