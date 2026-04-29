@@ -227,7 +227,10 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
         logger.debug("is_valid_cq_code matched, is it a file ?")
         for segment in event.message:
             logger.debug("segment.data : {}".format(segment.data))
-        msg = "暂不支持的信息类型"
+            _read_file = await ai_file_reader(segment, bot)
+            logger.debug("_read_file : {}".format(_read_file))
+
+        return  # 暂未完成
 
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写

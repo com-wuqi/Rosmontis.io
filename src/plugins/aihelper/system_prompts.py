@@ -12,7 +12,7 @@ _flie_list = [
 ]
 for _md_file in _flie_list:
     with open(_md_file, encoding="utf-8") as f:
-        logger.debug(_md_file)
+        logger.debug(f"found a markdown file: {_md_file}")
         _tool_system_prompts_list.append(
             {"role": "system", "content": f.read()}
         )

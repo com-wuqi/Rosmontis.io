@@ -6,7 +6,6 @@ from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
-from .image_reader import *
 
 __plugin_meta__ = PluginMetadata(
     name="ai_file_reader",
@@ -17,6 +16,8 @@ __plugin_meta__ = PluginMetadata(
 
 _config = get_plugin_config(Config)
 config = _config.ai_file_reader
+
+from .image_reader import *
 
 message_matcher: Dict[Callable, Callable] = {
     is_supported_image: read_image
@@ -48,7 +49,7 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
 
     for key, value in message_matcher.items():
         if key(file_name):
-            _result_msg = value(file_name, file_url)
+            _result_msg = await value(file_name, file_url)
             result_msg = _result_msg if _result_msg else result_msg
             break
 
