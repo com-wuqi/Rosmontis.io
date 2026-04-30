@@ -225,12 +225,13 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
 
     if is_valid_cq_code(msg):
         logger.debug("is_valid_cq_code matched, is it a file ?")
+        msg = ""
         for segment in event.message:
             logger.debug("segment.data : {}".format(segment.data))
             _read_file = await ai_file_reader(segment, bot)
             logger.debug("_read_file : {}".format(_read_file))
-
-        return  # 暂未完成
+            msg = msg + "\n" + _read_file
+        # return  # 暂未完成
 
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写
@@ -371,15 +372,13 @@ async def zip_db_ai_handle():
 
 @zip_db_ai.got("session_id",prompt="session_id：(默认值为当前会话id)")
 async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
-    session_id=-1
-    if not db_session_id.strip():
+    try:
+        session_id = int(db_session_id.strip())
+    except ValueError:
+        await zip_db_ai.send("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
         session_id, session_type = get_comments_id(event)
         await zip_db_ai.send("session_id 未提供, 使用 {}".format(session_id))
-    else:
-        try:
-            session_id = int(db_session_id.strip())
-        except ValueError:
-            await zip_db_ai.reject("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
+
     lock = get_session_lock(session_id)
     row = await get_config_by_id(sid=session_id, session=session)
     # 这里使用的时候内存中没有有配置信息, 但是压缩需要 token , 还是由发起者承担
