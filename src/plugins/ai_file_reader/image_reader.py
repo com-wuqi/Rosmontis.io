@@ -114,12 +114,15 @@ async def read_image(file_name: str, file_url: str) -> str | None:
     _return = None
     mime_type, _ = mimetypes.guess_type(file_name)
     try:
-        assert mime_type is not None, "guess type error"
+        if mime_type is None:
+            raise RuntimeError("guess type error")
         # 图片下载，压缩
         _try_download = await download_file(file_url, str(image_path))
-        assert _try_download == 0, "download failed"
+        if _try_download != 0:
+            raise RuntimeError("download failed")
         await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))
-        assert os.path.exists(str(compressed_image_path)), "compress failed"
+        if not os.path.exists(str(compressed_image_path)):
+            raise RuntimeError("compress image failed")
         base64_image = await encode_image_async(str(compressed_image_path))
         client = AsyncOpenAI(base_url=config.image_ai_api_url, api_key=config.image_ai_api_key,
                              timeout=config.image_ai_api_timeout)
