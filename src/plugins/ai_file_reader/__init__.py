@@ -33,6 +33,8 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
     if not config.is_enable:
         return result_msg
 
+    message_type = ""
+
     if segment.type == "file":
         file_id = segment.data.get("file_id", None)
         # 文件的唯一ID
@@ -40,18 +42,22 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
         # 文件名
         if (file_id is None) or (file_name is None):
             return result_msg
-
-        file_info = await bot.call_api("get_private_file_url", file_id=file_id)
-        file_url = file_info["url"]
+        message_type = "file_id"
+        file_url = None
 
     else:
         file_name = segment.data.get("file", None)
         file_url = segment.data.get("url", None)
         if (file_url is None) or (file_name is None):
             return result_msg
+        message_type = "file_url"
+        file_id = None
 
     for index, (key, value) in enumerate(message_matcher.items()):
         if key(file_name) and message_matcher_switch[index]:  # 根据索引判断开关状态
+            if message_type == "file_id":
+                file_info = await bot.call_api("get_private_file_url", file_id=file_id)
+                file_url = file_info["url"]
             _result_msg = await value(file_name, file_url)
             result_msg = _result_msg if _result_msg else result_msg
             break

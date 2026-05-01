@@ -153,4 +153,4 @@ async def read_image(file_name: str, file_url: str) -> str | None:
         image_path.unlink(missing_ok=True)
         compressed_image_path.unlink(missing_ok=True)
 
-    return str(_return)
+    return None

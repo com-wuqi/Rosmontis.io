@@ -84,13 +84,13 @@ async def download_file(url: str, save_path: str, header: dict | None = None) ->
     async with semaphore_download:
         async with httpx.AsyncClient(headers=headers, http2=True, follow_redirects=True, max_redirects=5,
                                      timeout=120) as client:
-            async with client.stream("GET", url) as response:
                 try:
-                    response.raise_for_status()  # 检查 HTTP 错误
-                    async with aiofiles.open(save_path, "wb") as f:
-                        async for chunk in response.aiter_bytes(chunk_size=262144):
-                            await f.write(chunk)
-                    return 0
+                    async with client.stream("GET", url) as response:
+                        response.raise_for_status()  # 检查 HTTP 错误
+                        async with aiofiles.open(save_path, "wb") as f:
+                            async for chunk in response.aiter_bytes(chunk_size=262144):
+                                await f.write(chunk)
+                        return 0
                 except Exception as e:
                     logger.warning(e)
                     return -1
