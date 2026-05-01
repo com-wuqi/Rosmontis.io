@@ -1,16 +1,19 @@
 import json
+import re
 
 from nonebot import get_driver, require
 from nonebot import on_command, on_message
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent, Bot
 from nonebot.internal.params import ArgPlainText
+
+from .system_prompts import tool_system_prompts_list
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
 from . import config
-require("nonebot_plugin_apscheduler")
+# require("nonebot_plugin_apscheduler")
 from .aihelper_handles import *
-from .system_prompts import tool_system_prompts_list
+
 _Messages_dicts = {}
 # 这里应该是 {comments_id : Messages} 这里的id用于区分不同用户
 # 这个池子存储所有用户的所有对话信息
@@ -33,6 +36,16 @@ zip_db_ai = on_command("ai zp db",priority=80,block=False)
 
 ai_chat = on_message(priority=8, block=False)
 # 处理非命令消息
+
+# _debug_message = on_message(priority=1, block=False)
+# 捕获所有信息，备用|调试用途
+
+def is_valid_cq_code(s: str) -> bool:
+    """
+    判断字符串是否为合规的 CQ 码
+    """
+    pattern = r"\[CQ:(?P<type>[a-zA-Z0-9-_.]+)" + r"(?P<params>" + r"(?:,[a-zA-Z0-9-_.]+=[^,\]]*)*" + r"),?\]"
+    return bool(re.fullmatch(pattern, s.strip()))
 
 def get_session_lock(session_id: int) -> asyncio.Lock:
     """获取或创建指定会话的锁"""
@@ -202,13 +215,24 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
 
 
 @ai_chat.handle()
-async def ai_chat_handle(event: MessageEvent):
+async def ai_chat_handle(event: MessageEvent, bot: Bot):
     session_id,session_type = get_comments_id(event)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复
     msg = str(event.get_message()).strip()
     if not msg:
         return
+
+    if is_valid_cq_code(msg):
+        logger.debug("is_valid_cq_code matched, is it a file ?")
+        msg = ""
+        for segment in event.message:
+            logger.debug("segment.data : {}".format(segment.data))
+            _read_file = await ai_file_reader(segment, bot)
+            logger.debug("_read_file : {}".format(_read_file))
+            msg = msg + "\n" + _read_file
+        # return  # 暂未完成
+
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写
         try:
@@ -276,9 +300,13 @@ async def ai_chat_handle(event: MessageEvent):
                     _raw_message.append(
                         {"tool_call_id": tool_call.id, "role": "tool", "content": "fail: invalid arguments"})
                     continue
+
                 try:
                     logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
-                    _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
+                    if function_name in checked_hooked_mcp_tools.keys():
+                        _result = await checked_hooked_mcp_tools[function_name](**function_args)
+                    else:
+                        _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
                     logger.debug(f"MCP : function_name:{function_name} function_result:{_result}")
                     _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
                 except Exception as e:
@@ -344,15 +372,13 @@ async def zip_db_ai_handle():
 
 @zip_db_ai.got("session_id",prompt="session_id：(默认值为当前会话id)")
 async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
-    session_id=-1
-    if not db_session_id.strip():
+    try:
+        session_id = int(db_session_id.strip())
+    except ValueError:
+        await zip_db_ai.send("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
         session_id, session_type = get_comments_id(event)
         await zip_db_ai.send("session_id 未提供, 使用 {}".format(session_id))
-    else:
-        try:
-            session_id = int(db_session_id.strip())
-        except ValueError:
-            await zip_db_ai.reject("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
+
     lock = get_session_lock(session_id)
     row = await get_config_by_id(sid=session_id, session=session)
     # 这里使用的时候内存中没有有配置信息, 但是压缩需要 token , 还是由发起者承担
@@ -371,6 +397,12 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
             await zip_db_ai.finish("zip_db_ai. success")
         else:
             await zip_db_ai.finish("db is empty, finished")
+
+# @_debug_message.handle()
+# async def debug_message_handle(event: MessageEvent):
+#     # logger.debug("MessageEvent.message_type: {}".format(event.message_type))
+#     logger.debug("MessageEvent.raw_message: {}".format(event.raw_message))
+#     return
 
 # # 自动压缩逻辑(内存中, 缺少测试)
 # @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")

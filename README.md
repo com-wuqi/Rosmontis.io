@@ -130,6 +130,8 @@ Host: 0.0.0.0 ,
 
 Port: 3001 ,
 
+心跳间隔：10000 （不修改可能导致反复连接超时）
+
 选择启用 ,
 
 token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
@@ -208,6 +210,10 @@ https://github.com/sansenjian/quick-e2b-sandbox
 ## Tip
 
 `src/plugins/aihelper/md_prompts` 里面所有的markdown文件都会作为AI提示词
+
+`requirements.txt` 内部包含了这个文件的生成方式
+
+`pip install --upgrade -r requirements.txt` 可以根据 `requirements.txt` 更新依赖
 
 ## 许可证
 

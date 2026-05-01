@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="nonebot-venv" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="nonebot-venv" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12 (Rosmontis)" project-jdk-type="Python SDK" />
 </project>

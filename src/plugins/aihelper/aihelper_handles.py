@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Callable
 from typing import List, Dict
 
 import aiofiles
@@ -8,6 +9,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select
 
+from . import config
 from .models import *
 
 require("nonebot_plugin_orm")
@@ -23,6 +25,23 @@ import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
 import src.plugins.public_apis as public_api
+
+require("src.plugins.hooked_mcp_tools")
+import src.plugins.hooked_mcp_tools as hooked_mcp_tools
+
+require("src.plugins.ai_file_reader")
+import src.plugins.ai_file_reader as ai_file
+
+ai_file_reader = ai_file.ai_file_reader
+
+checked_hooked_mcp_tools: Dict[str, Callable] = {}
+for _key in hooked_mcp_tools.hooked_functions.keys():
+    _func = hooked_mcp_tools.hooked_functions[_key]
+    if callable(_func):
+        checked_hooked_mcp_tools[_key] = _func
+    else:
+        logger.warning(f"hooked_mcp_tools key:{_key} ,function is not callable")
+hooked_tools = hooked_mcp_tools.hooked_tools
 
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
@@ -44,11 +63,11 @@ async def get_model_names(key:str,url:str) -> List[str]:
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
         tools = mcp_manger.all_tools if mcp_manger is not None else []
-        client = AsyncOpenAI(base_url=url, api_key=key, timeout=180)
+        client = AsyncOpenAI(base_url=url, api_key=key, timeout=config.api_timeout)
         chat_completion = await client.chat.completions.create(
             model=model_name,
             messages=messages,
-            tools=tools,
+            tools=tools + hooked_tools,
             temperature=temperature
         )
         return chat_completion.choices[0].message

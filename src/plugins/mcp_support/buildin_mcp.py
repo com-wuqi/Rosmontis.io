@@ -28,7 +28,6 @@ def _configure_font():
     font_path = '/tmp/SimHei.ttf'
     if not os.path.exists(font_path):
         try:
-            # 使用 -s 参数静默下载，避免进度信息污染 stderr
             os.system('curl -s -L -o /tmp/SimHei.ttf https://github.com/StellarCN/scp_zh/raw/master/fonts/SimHei.ttf')
         except: pass
 
