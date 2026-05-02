@@ -66,6 +66,12 @@ mcp_configs = [
             # 云沙箱(py3代码执行) https://e2b.dev/ 注册
             "E2B_API_KEY": "e2b_",
             # https://e2b.dev/ 注册
+            "is_enable_knowledge": "false",  # 是否启用knowledge
+            "knowledge_api_url": "",
+            "knowledge_api_token": "",
+            "knowledge_api_model_name": "",
+            "knowledge_api_timeout": "300",
+
         },
         prefix="ros",
     ),

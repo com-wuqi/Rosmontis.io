@@ -31,9 +31,12 @@ class MultiMCPManager:
             self._ready_events[cfg.name] = asyncio.Event()  # 插入事件
             task = asyncio.create_task(self._run_server(cfg))
             self._tasks.append(task)
+
         try:
-            await asyncio.wait_for(asyncio.gather(
-                *[ev.wait() for ev in self._ready_events.values()]),
+            await asyncio.wait_for(
+                asyncio.gather(
+                    *[ev.wait() for ev in self._ready_events.values()]
+                ),
                 timeout=mcp_init_timeout
             )
             logger.info("All MCP servers ready")
@@ -75,6 +78,7 @@ class MultiMCPManager:
 
         except Exception as e:
             logger.warning(f"Server: {cfg.name} init failed: {e}")
+            raise
 
         finally:
             if session_entered:
