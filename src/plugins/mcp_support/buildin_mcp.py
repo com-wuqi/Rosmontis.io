@@ -1,18 +1,43 @@
-import os
 from typing import Dict, Any
 
+import asyncio
+import chromadb
 import httpx
+from chromadb.api.models.AsyncCollection import AsyncCollection
+from chromadb.config import Settings
 from e2b_code_interpreter import AsyncSandbox, SandboxLifecycle, SandboxState
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 
 from buildin_mcp_share import *
+from knowledge_tools import *
 
-mcp = FastMCP("rosmontis_mcp")
 env_dict = dict(os.environ)
 
 dir_list = [os.path.abspath("mcp_workdir/fs"), os.path.abspath("mcp_workdir/memory")]
+file_list = [env_dict.get("knowledge_db_fir", "./test_knowledge.db")]
 for dir_1 in dir_list:
     os.makedirs(dir_1, exist_ok=True)
+for file_1 in file_list:
+    if not os.path.exists(file_1):
+        pass
+
+mcp = FastMCP("rosmontis_mcp")
+
+
+async def init_chromadb_client():
+    chroma_client = await chromadb.AsyncClientCreator.create(
+        settings=Settings(
+            persist_directory=env_dict.get("knowledge_db_fir", "./test_knowledge.db")
+        )
+    )
+
+    collection = await chroma_client.get_or_create_collection(
+        name="local_knowledge_base",
+        metadata={"hnsw:space": "cosine"}  # 使用余弦相似度，更适合 OpenAI 嵌入
+    )
+    return chroma_client, collection
+
+
 
 _user_sandboxs: Dict[int, Any | None] = {}
 _sandbox_locks: Dict[int, asyncio.Lock] = {}
@@ -50,6 +75,35 @@ def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     return _sandbox_locks[user_id]
 
 
+async def knowledge_sync_from_json(collection: AsyncCollection):
+    # use raw_jsons
+    get_from_collection = await collection.get()
+    collection_ids = set(get_from_collection["ids"])
+    json_ids = set()
+    file_jsons = {}  # 混合不同文件的json, key:id value:json
+    for file_items in raw_jsons:
+        for items in file_items:
+            if items.get("enabled", True) and items.get("id", False):
+                json_ids.add(items.get("id"))
+                file_jsons[items.get("id")] = items
+
+    to_delete = collection_ids - json_ids
+    if to_delete:
+        await collection.delete(ids=list(to_delete))
+
+    to_add = json_ids - collection_ids
+    to_add_ids = []
+    to_add_texts = []
+    to_add_metadata = []
+    if to_add:
+        for a_id in list(to_add):
+            to_add_ids.append(a_id)
+            to_add_texts.append(file_jsons[a_id]["text"])
+            to_add_metadata.append(file_jsons[a_id]["metadata"])
+    # to_add_embeddings = await get_all_embedding(sems=2,txt_list=to_add_texts,url=env_dict.get())
+
+
+
 async def get_sandbox(user_id: int, timeout: int = 86_400) -> Any | None | str:
     if user_id in _user_sandboxs:
         sbx_info = await _user_sandboxs[user_id].get_info()
@@ -80,11 +134,12 @@ async def get_sandbox(user_id: int, timeout: int = 86_400) -> Any | None | str:
     return _user_sandboxs[user_id]
 
 
-def get_current_time():
+async def get_current_time(ctx: Context):
     """
     获取当前的系统时间
     :return: 时间字符串, 格式为：YYYY-MM-DD HH:MM:SS
     """
+    await ctx.debug("bulidin_mcp: get_current_time")
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
@@ -205,6 +260,7 @@ if __name__ == "__main__":
         is_enable_get_current_time = env_dict.get("IS_ENABLE_GET_CURRENT_TIME", "false")
         is_enable_call_web_search = env_dict.get("IS_ENABLE_CALL_WEB_SEARCH", "false")
         is_enable_run_code_in_e2b = env_dict.get("IS_ENABLE_RUN_CODE_IN_E2B", "false")
+        is_enable_knowledge = env_dict.get("IS_ENABLE_KNOWLEDGE", "false")
 
         if is_enable_get_current_time == "true":
             mcp.add_tool(get_current_time)
@@ -220,6 +276,8 @@ if __name__ == "__main__":
                 mcp.add_tool(e2b_get_file)
             else:
                 pass
+        if is_enable_knowledge:
+            pass
 
         mcp.run(transport="stdio")
     except (KeyboardInterrupt, Exception) as e:

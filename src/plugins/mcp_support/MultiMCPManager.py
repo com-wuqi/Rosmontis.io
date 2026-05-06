@@ -6,6 +6,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import LoggingMessageNotification
 from nonebot.log import logger
 
 from .mcp_config import McpServerConfig, mcp_init_timeout
@@ -61,7 +62,12 @@ class MultiMCPManager:
             read, write = await transport.__aenter__()
             transport_entered = True
 
-            session = ClientSession(read, write)
+            session = ClientSession(
+                read,
+                write,
+                logging_callback=self._handle_log_notification
+            )
+
             await session.__aenter__()
             session_entered = True
             await session.initialize()
@@ -200,3 +206,11 @@ class MultiMCPManager:
                 cfg.name: cfg.transport for cfg in self.configs
             }
         }
+
+    @staticmethod
+    async def _handle_log_notification(params: LoggingMessageNotification):
+        level = params.level.lower()
+        data = params.data
+        msg = data.get("msg", str(data)) if isinstance(data, dict) else str(data)
+        log_func = getattr(logger, level, logger.info)
+        log_func(f"[MCP Log] {msg}")

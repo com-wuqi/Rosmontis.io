@@ -6,6 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
       <excludeFolder url="file://$MODULE_DIR$/mcp_workdir" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/src/plugins/testplugins" />
     </content>
     <orderEntry type="jdk" jdkName="rosmontis" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
