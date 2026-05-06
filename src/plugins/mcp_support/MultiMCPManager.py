@@ -1,4 +1,5 @@
 import asyncio
+import httpx
 from contextlib import AbstractAsyncContextManager
 from typing import Dict, Any
 
@@ -6,7 +7,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.streamable_http import streamable_http_client
-from mcp.types import LoggingMessageNotification
+from mcp.types import LoggingMessageNotificationParams
 from nonebot.log import logger
 
 from .mcp_config import McpServerConfig, mcp_init_timeout
@@ -119,10 +120,14 @@ class MultiMCPManager:
         elif cfg.transport == "streamable-http":
             if not cfg.url:
                 raise ValueError(f"streamable-http '{cfg.name}'need url")
+
+            custom_client = httpx.AsyncClient(
+                timeout=cfg.timeout,  # 你的超时值（例如 httpx.Timeout(30.0)）
+                headers=cfg.headers or {}  # 你的自定义头
+            )
             return streamable_http_client(
                 url=cfg.url,
-                timeout=cfg.timeout,
-                headers=cfg.headers or {}
+                http_client=custom_client,
             )
         else:
             raise ValueError(f"transport {cfg.transport} not supported")
@@ -208,7 +213,7 @@ class MultiMCPManager:
         }
 
     @staticmethod
-    async def _handle_log_notification(params: LoggingMessageNotification):
+    async def _handle_log_notification(params: LoggingMessageNotificationParams):
         level = params.level.lower()
         data = params.data
         msg = data.get("msg", str(data)) if isinstance(data, dict) else str(data)

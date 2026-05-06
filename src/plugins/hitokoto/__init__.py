@@ -1,6 +1,6 @@
 from nonebot import get_plugin_config, on_command
 from nonebot import require
-from nonebot.adapters.onebot.v11 import MessageEvent, Bot, Message, GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.onebot.v11 import MessageEvent, Message, GroupMessageEvent, PrivateMessageEvent
 from nonebot.log import logger
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
@@ -69,7 +69,7 @@ async def handle_yiyan_cache():
 get_yiyan = on_command("yiyan", priority=5)
 
 @get_yiyan.handle()
-async def handle_yiyan(bot: Bot,event: MessageEvent, args: Message = CommandArg()):
+async def handle_yiyan(event: MessageEvent, args: Message = CommandArg()):
     if not _is_enable:
         await get_yiyan.finish("is disabled")
         return

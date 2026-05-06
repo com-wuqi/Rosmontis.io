@@ -85,7 +85,7 @@ async def download_gpt_sovits_tts_file(get_request_url: str):
         try:
             remote_path = await public_apis.upload_file(path=str(temp_path))
         except Exception as e:
-            logger.exception("文件上传失败")
+            logger.warning("文件上传失败: {}".format(e))
             return None, "文件上传失败"
 
         if not remote_path:
