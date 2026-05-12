@@ -458,7 +458,7 @@ python-markdown-math==0.9
     # via
     #   -r requirements.txt
     #   nonebot-plugin-htmlrender
-python-multipart==0.0.26
+python-multipart==0.0.27
     # via
     #   -r requirements.txt
     #   mcp
@@ -590,7 +590,7 @@ tzlocal==5.3.1
     # via
     #   -r requirements.txt
     #   apscheduler
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   -r requirements.txt
     #   kubernetes
