@@ -27,8 +27,7 @@ for _file in _file_list:
         pass
 
 
-
-async def get_embedding(sem, txt: str, url: str, key: str, model_name: str, timeout=300):
+async def get_embedding(sem, txt: str, url: str | None, key: str | None, model_name: str | None, timeout=300):
     async with sem:
         client = AsyncClient(base_url=url, api_key=key, timeout=timeout)
         text = txt.strip()
@@ -36,7 +35,8 @@ async def get_embedding(sem, txt: str, url: str, key: str, model_name: str, time
         return res
 
 
-async def get_all_embedding(sems: int, txt_list: List[str], url: str, key: str, model_name: str, timeout=300):
+async def get_all_embedding(sems: int, txt_list: List[str], url: str | None, key: str | None, model_name: str | None,
+                            timeout=300):
     # 提供条目合集的向量化, 这里的 keys 对应 ids
     sem = asyncio.Semaphore(sems)
     workers = [get_embedding(sem, txt, url, key, model_name, timeout) for txt in txt_list]
