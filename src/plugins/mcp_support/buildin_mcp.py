@@ -1,6 +1,5 @@
 from typing import Dict, Any
 
-import asyncio
 import chromadb
 import httpx
 from chromadb.api.models.AsyncCollection import AsyncCollection
@@ -75,7 +74,7 @@ def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     return _sandbox_locks[user_id]
 
 
-async def knowledge_sync_from_json(collection: AsyncCollection):
+async def knowledge_sync_from_json(ctx: Context, collection: AsyncCollection):
     # use raw_jsons
     get_from_collection = await collection.get()
     collection_ids = set(get_from_collection["ids"])
@@ -89,6 +88,7 @@ async def knowledge_sync_from_json(collection: AsyncCollection):
 
     to_delete = collection_ids - json_ids
     if to_delete:
+        await ctx.debug("delete {} lines".format(len(to_delete)))
         await collection.delete(ids=list(to_delete))
 
     to_add = json_ids - collection_ids
@@ -100,7 +100,12 @@ async def knowledge_sync_from_json(collection: AsyncCollection):
             to_add_ids.append(a_id)
             to_add_texts.append(file_jsons[a_id]["text"])
             to_add_metadata.append(file_jsons[a_id]["metadata"])
-    # to_add_embeddings = await get_all_embedding(sems=2,txt_list=to_add_texts,url=env_dict.get())
+    to_add_embeddings = await get_all_embedding(
+        sems=2, txt_list=to_add_texts,
+        url=env_dict.get("KNOWLEDGE_API_URL"), key=env_dict.get("KNOWLEDGE_API_TOKEN"),
+        model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"), timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT"))
+    await collection.upsert(ids=to_add_ids, documents=to_add_texts, embeddings=to_add_embeddings)
+
 
 
 
@@ -265,8 +270,9 @@ if __name__ == "__main__":
         if is_enable_get_current_time == "true":
             mcp.add_tool(get_current_time)
         if is_enable_call_web_search == "true":
-            if env_dict.get("WEBSEARCH_BASE_URL") and env_dict.get("WEBSEARCH_TIMEOUT") and env_dict.get(
-                    "WEBSEARCH_API_KEY"):
+            if (env_dict.get("WEBSEARCH_BASE_URL")
+                    and env_dict.get("WEBSEARCH_TIMEOUT")
+                    and env_dict.get("WEBSEARCH_API_KEY")):
                 mcp.add_tool(call_web_search)
             else:
                 pass

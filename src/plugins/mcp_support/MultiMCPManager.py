@@ -1,8 +1,8 @@
 import asyncio
-import httpx
 from contextlib import AbstractAsyncContextManager
 from typing import Dict, Any
 
+import httpx
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client, StdioServerParameters
@@ -216,6 +216,6 @@ class MultiMCPManager:
     async def _handle_log_notification(params: LoggingMessageNotificationParams):
         level = params.level.lower()
         data = params.data
-        msg = data.get("msg", str(data)) if isinstance(data, dict) else str(data)
+        msg = data  # 似乎主动通过ctx提交log也只会包含包名，没有函数信息
         log_func = getattr(logger, level, logger.info)
         log_func(f"[MCP Log] {msg}")
