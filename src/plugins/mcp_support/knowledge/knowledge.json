@@ -1,0 +1,26 @@
+[
+  {
+    "id": "policy_test_1",
+    "text": "NapCat是基于 TypeScript 构建的 Bot 框架，通过相应的启动器或者框架，主动调用 QQ Node 模块提供给客户端的接口，实现 Bot 的功能。",
+    "metadata": {
+      "source": "policy_test_1",
+      "version": "v1.0",
+      "updated": "2026-05-02",
+      "tags": [
+        "test"
+      ],
+      "enabled": true
+    }
+  },
+  {
+    "id": "policy_test_2",
+    "text": "NoneBot2 是一个现代、跨平台、可扩展的 Python 聊天机器人框架，它基于 Python 的类型注解和异步优先特性（兼容同步），能够为你的需求实现提供便捷灵活的支持。",
+    "metadata": {
+      "source": "policy_test_2",
+      "version": "v1.0",
+      "tags": [
+        "test"
+      ]
+    }
+  }
+]

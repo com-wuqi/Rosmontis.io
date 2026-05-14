@@ -147,3 +147,5 @@ mcp_workdir/
 mcp_config.py
 cookies-*.json
 data.db
+testplugins/
+*test*.db

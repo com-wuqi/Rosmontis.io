@@ -233,6 +233,9 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             msg = msg + "\n" + _read_file
         # return  # 暂未完成
 
+    # 可以在信息被AI处理之前，就是此处，注入向量检索的结果
+    # _raw_message.append 实现
+
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表和配置的读写
         try:

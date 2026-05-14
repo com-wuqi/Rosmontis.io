@@ -2,10 +2,12 @@ import asyncio
 from contextlib import AbstractAsyncContextManager
 from typing import Dict, Any
 
+import httpx
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import LoggingMessageNotificationParams
 from nonebot.log import logger
 
 from .mcp_config import McpServerConfig, mcp_init_timeout
@@ -31,9 +33,12 @@ class MultiMCPManager:
             self._ready_events[cfg.name] = asyncio.Event()  # 插入事件
             task = asyncio.create_task(self._run_server(cfg))
             self._tasks.append(task)
+
         try:
-            await asyncio.wait_for(asyncio.gather(
-                *[ev.wait() for ev in self._ready_events.values()]),
+            await asyncio.wait_for(
+                asyncio.gather(
+                    *[ev.wait() for ev in self._ready_events.values()]
+                ),
                 timeout=mcp_init_timeout
             )
             logger.info("All MCP servers ready")
@@ -58,7 +63,12 @@ class MultiMCPManager:
             read, write = await transport.__aenter__()
             transport_entered = True
 
-            session = ClientSession(read, write)
+            session = ClientSession(
+                read,
+                write,
+                logging_callback=self._handle_log_notification
+            )
+
             await session.__aenter__()
             session_entered = True
             await session.initialize()
@@ -75,6 +85,7 @@ class MultiMCPManager:
 
         except Exception as e:
             logger.warning(f"Server: {cfg.name} init failed: {e}")
+            raise
 
         finally:
             if session_entered:
@@ -109,10 +120,14 @@ class MultiMCPManager:
         elif cfg.transport == "streamable-http":
             if not cfg.url:
                 raise ValueError(f"streamable-http '{cfg.name}'need url")
+
+            custom_client = httpx.AsyncClient(
+                timeout=cfg.timeout,  # 你的超时值（例如 httpx.Timeout(30.0)）
+                headers=cfg.headers or {}  # 你的自定义头
+            )
             return streamable_http_client(
                 url=cfg.url,
-                timeout=cfg.timeout,
-                headers=cfg.headers or {}
+                http_client=custom_client,
             )
         else:
             raise ValueError(f"transport {cfg.transport} not supported")
@@ -196,3 +211,11 @@ class MultiMCPManager:
                 cfg.name: cfg.transport for cfg in self.configs
             }
         }
+
+    @staticmethod
+    async def _handle_log_notification(params: LoggingMessageNotificationParams):
+        level = params.level.lower()
+        data = params.data
+        msg = data  # 似乎主动通过ctx提交log也只会包含包名，没有函数信息
+        log_func = getattr(logger, level, logger.info)
+        log_func(f"[MCP Log] {msg}")
