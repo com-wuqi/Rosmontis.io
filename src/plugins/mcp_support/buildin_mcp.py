@@ -23,7 +23,7 @@ mcp = FastMCP("rosmontis_mcp")
 
 
 def init_chromadb_client() -> Tuple[Any, chromadb.api.models.Collection.Collection]:
-    chroma_client = chromadb.PersistentClient(path=env_dict.get("knowledge_db_fir", "./test_knowledge.db"))
+    chroma_client = chromadb.PersistentClient(path=env_dict.get("KNOWLEDGE_DB_DIR", "./test_knowledge.db"))
     collection = chroma_client.get_or_create_collection(
         name="local_knowledge_base",
         metadata={"hnsw:space": "cosine"},  # 使用余弦相似度，更适合 OpenAI 嵌入
@@ -111,7 +111,7 @@ async def get_knowledge(
         query: str,
         counts: int = 2) -> List[str]:
     query_embedding = await get_embedding(
-        sem=1, txt=query,
+        txt=query, use_sem=False,
         url=env_dict.get("KNOWLEDGE_API_URL"), key=env_dict.get("KNOWLEDGE_API_TOKEN"),
         model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"), timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT")
     )
@@ -128,8 +128,7 @@ async def get_sandbox(ctx: Context, user_id: int, timeout: int = 86_400) -> Any 
         if sbx_info.state in [SandboxState.PAUSED, SandboxState.RUNNING]:
             return _user_sandboxs[user_id]
         else:
-            pass
-            await ctx.debug(f"sandbox user {user_id} is not running: {_user_sandboxs[user_id].get_info().state}")
+            await ctx.debug(f"user {user_id}: sandbox is not running")
     else:
         await ctx.debug(f"sandbox user {user_id} is not in dict")
     try:
@@ -302,7 +301,7 @@ if __name__ == "__main__":
                 mcp.add_tool(e2b_get_file)
             else:
                 pass
-        if is_enable_knowledge:
+        if is_enable_knowledge == "true":
             if (env_dict.get("KNOWLEDGE_API_URL")
                     and env_dict.get("KNOWLEDGE_API_TOKEN")
                     and env_dict.get("KNOWLEDGE_API_MODEL_NAME")

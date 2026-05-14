@@ -71,7 +71,7 @@ mcp_configs = [
             "KNOWLEDGE_API_TOKEN": "",
             "KNOWLEDGE_API_MODEL_NAME": "",  # 模型名称
             "KNOWLEDGE_API_TIMEOUT": "300",  # api 接口超时
-            "KNOWLEDGE_DB_FIR": "./test_knowledge.db"  # 需要提供，默认当前，向量数据库的位置
+            "KNOWLEDGE_DB_DIR": "./test_knowledge.db"  # 需要提供，默认当前，向量数据库的位置
 
         },
         prefix="ros",

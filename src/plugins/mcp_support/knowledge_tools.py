@@ -21,24 +21,42 @@ for _file in _file_list:
             raw_jsons.append(json.load(f))
     except FileNotFoundError as e:
         pass
-    except json.JSONDecoder as e:
+    except json.JSONDecodeError as e:
         pass
     except Exception as e:
         pass
 
 
-async def get_embedding(sem, txt: str, url: str | None, key: str | None, model_name: str | None, timeout=300):
-    sems = asyncio.Semaphore(sem)
-    async with sems:
+async def get_embedding(
+        txt: str, url: str | None,
+        key: str | None, model_name: str | None,
+        timeout=300, sem: asyncio.Semaphore = None,
+        use_sem: bool = False  # 使用 asyncio.Semaphore
+):
+    if use_sem:
+        async with sem:
+            client = AsyncClient(base_url=url, api_key=key, timeout=int(timeout))
+            text = txt.strip()
+            res = await client.embeddings.create(input=[text], model=model_name)
+            return res.data[0].embedding
+    else:
         client = AsyncClient(base_url=url, api_key=key, timeout=int(timeout))
         text = txt.strip()
         res = await client.embeddings.create(input=[text], model=model_name)
         return res.data[0].embedding
 
 
+
 async def get_all_embedding(sem: int, txt_list: List[str], url: str | None, key: str | None, model_name: str | None,
                             timeout=300):
     # 提供条目合集的向量化, 这里的 keys 对应 ids
-    workers = [get_embedding(sem, txt, url, key, model_name, int(timeout)) for txt in txt_list]
+    sems = asyncio.Semaphore(sem)
+    workers = [
+        get_embedding(
+            sem=sems, txt=txt, url=url, key=key, model_name=model_name, timeout=int(timeout),
+            use_sem=True
+        )
+        for txt in txt_list
+    ]
     result = await asyncio.gather(*workers, return_exceptions=False)
     return result
