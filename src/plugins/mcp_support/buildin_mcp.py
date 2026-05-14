@@ -1,9 +1,8 @@
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 import chromadb
 import httpx
 from chromadb.api.models.AsyncCollection import AsyncCollection
-from chromadb.config import Settings
 from e2b_code_interpreter import AsyncSandbox, SandboxLifecycle, SandboxState
 from mcp.server.fastmcp import FastMCP, Context
 
@@ -23,19 +22,14 @@ for file_1 in file_list:
 mcp = FastMCP("rosmontis_mcp")
 
 
-async def init_chromadb_client():
-    chroma_client = await chromadb.AsyncClientCreator.create(
-        settings=Settings(
-            persist_directory=env_dict.get("knowledge_db_fir", "./test_knowledge.db")
-        )
-    )
-
-    collection = await chroma_client.get_or_create_collection(
+def init_chromadb_client() -> Tuple[Any, chromadb.api.models.Collection.Collection]:
+    chroma_client = chromadb.PersistentClient(path=env_dict.get("knowledge_db_fir", "./test_knowledge.db"))
+    collection = chroma_client.get_or_create_collection(
         name="local_knowledge_base",
-        metadata={"hnsw:space": "cosine"}  # 使用余弦相似度，更适合 OpenAI 嵌入
+        metadata={"hnsw:space": "cosine"},  # 使用余弦相似度，更适合 OpenAI 嵌入
+        embedding_function=None
     )
     return chroma_client, collection
-
 
 
 _user_sandboxs: Dict[int, Any | None] = {}
@@ -67,6 +61,7 @@ try:
 except: pass
 """
 
+
 def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     """获取或创建指定 sandbox 的锁"""
     if user_id not in _sandbox_locks:
@@ -74,9 +69,9 @@ def get_sandbox_lock(user_id: int) -> asyncio.Lock:
     return _sandbox_locks[user_id]
 
 
-async def knowledge_sync_from_json(ctx: Context, collection: AsyncCollection):
+def knowledge_sync_from_json(collection: chromadb.api.models.Collection.Collection):
     # use raw_jsons
-    get_from_collection = await collection.get()
+    get_from_collection = collection.get()
     collection_ids = set(get_from_collection["ids"])
     json_ids = set()
     file_jsons = {}  # 混合不同文件的json, key:id value:json
@@ -88,8 +83,7 @@ async def knowledge_sync_from_json(ctx: Context, collection: AsyncCollection):
 
     to_delete = collection_ids - json_ids
     if to_delete:
-        await ctx.debug("delete {} lines".format(len(to_delete)))
-        await collection.delete(ids=list(to_delete))
+        collection.delete(ids=list(to_delete))
 
     to_add = json_ids - collection_ids
     to_add_ids = []
@@ -100,26 +94,44 @@ async def knowledge_sync_from_json(ctx: Context, collection: AsyncCollection):
             to_add_ids.append(a_id)
             to_add_texts.append(file_jsons[a_id]["text"])
             to_add_metadata.append(file_jsons[a_id]["metadata"])
-    to_add_embeddings = await get_all_embedding(
-        sems=2, txt_list=to_add_texts,
+        to_add_embeddings = asyncio.run(
+            get_all_embedding(sem=1, txt_list=to_add_texts, url=env_dict.get("KNOWLEDGE_API_URL"),
+                              key=env_dict.get("KNOWLEDGE_API_TOKEN"),
+                              model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"),
+                              timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT"))
+        )
+        collection.upsert(ids=to_add_ids, documents=to_add_texts, embeddings=to_add_embeddings)
+    else:
+        pass
+
+
+async def get_knowledge(
+        collection: chromadb.api.models.Collection.Collection,
+        ctx: Context,
+        query: str,
+        counts: int = 2) -> List[str]:
+    query_embedding = await get_embedding(
+        sem=1, txt=query,
         url=env_dict.get("KNOWLEDGE_API_URL"), key=env_dict.get("KNOWLEDGE_API_TOKEN"),
-        model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"), timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT"))
-    await collection.upsert(ids=to_add_ids, documents=to_add_texts, embeddings=to_add_embeddings)
+        model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"), timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT")
+    )
+    results = collection.query(query_embeddings=[query_embedding], n_results=counts)
+    # 文件保存的向量化数据，同步，不支持异步查询
+    documents = results['documents'][0]
+    await ctx.debug(f"get_knowledge: {documents}")
+    return documents
 
 
-
-
-async def get_sandbox(user_id: int, timeout: int = 86_400) -> Any | None | str:
+async def get_sandbox(ctx: Context, user_id: int, timeout: int = 86_400) -> Any | None | str:
     if user_id in _user_sandboxs:
         sbx_info = await _user_sandboxs[user_id].get_info()
         if sbx_info.state in [SandboxState.PAUSED, SandboxState.RUNNING]:
             return _user_sandboxs[user_id]
         else:
             pass
-            # logger.debug(f"sandbox user {user_id} is not running: {_user_sandboxs[user_id].get_info().state}")
+            await ctx.debug(f"sandbox user {user_id} is not running: {_user_sandboxs[user_id].get_info().state}")
     else:
-        pass
-        # logger.debug(f"sandbox user {user_id} is not in dict")
+        await ctx.debug(f"sandbox user {user_id} is not in dict")
     try:
         sandbox = await asyncio.wait_for(
             AsyncSandbox.create(
@@ -130,9 +142,11 @@ async def get_sandbox(user_id: int, timeout: int = 86_400) -> Any | None | str:
             ),
             timeout=60)
     except asyncio.TimeoutError as e1:
+        await ctx.debug(f"fail to create sandbox: TimeoutError: {e1}")
         return f"fail to create sandbox: TimeoutError: {e1}"
 
     except Exception as e1:
+        await ctx.debug(f"fail to create sandbox: Exception: {e1}")
         return f"fail to create sandbox: Exception: {e1}"
 
     _user_sandboxs[user_id] = sandbox
@@ -149,6 +163,7 @@ async def get_current_time(ctx: Context):
 
 
 async def call_web_search(
+        ctx: Context,
         query: str,
         freshness: str,
         summary: bool = True,
@@ -200,16 +215,20 @@ async def call_web_search(
 
                 return {"success": data}
             except httpx.TimeoutException:
+                await ctx.debug(str({"error": "请求超时"}))
                 return {"error": "请求超时"}
             except httpx.HTTPStatusError as e:
+                await ctx.debug(str({"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}))
                 return {"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}
             except KeyError as e:
+                await ctx.debug(str({"error": f"keyError: {e}"}))
                 return {"error": f"keyError: {e}"}
             except Exception as e:
+                await ctx.debug(str({"error": f"请求异常: {str(e)}"}))
                 return {"error": f"请求异常: {str(e)}"}
 
 
-async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], timeout: int = 300):
+async def run_code_in_e2b(ctx: Context, user_id: int, code: str, requirements: list[str], timeout: int = 300):
     """
     通过单次调用来执行 Python 代码, 使用 print 获得返回值,
     生成的文件不可直接打开，保存并 获取目录（print），然后获取 url
@@ -228,7 +247,7 @@ async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], time
 
         _lock = get_sandbox_lock(user_id=user_id)
         async with _lock:
-            sandbox = await get_sandbox(user_id=user_id, timeout=timeout)
+            sandbox = await get_sandbox(user_id=user_id, timeout=timeout, ctx=ctx)
             if type(sandbox) == str:
                 return {"fail": sandbox}
 
@@ -241,7 +260,7 @@ async def run_code_in_e2b(user_id: int, code: str, requirements: list[str], time
             return {"stdout": exec_codes.logs.stdout, "stderr": exec_codes.logs.stderr}
 
 
-async def e2b_get_file(user_id: int, path: str, file_timeout: int = 120):
+async def e2b_get_file(ctx: Context, user_id: int, path: str, file_timeout: int = 120):
     """
     根据 user_id 和 目录， 从E2B沙箱获取文件 url
     :param file_timeout: 链接有效期， 默认 120 秒
@@ -256,9 +275,10 @@ async def e2b_get_file(user_id: int, path: str, file_timeout: int = 120):
     async with semaphore_e2b:
         _lock = get_sandbox_lock(user_id=user_id)
         async with _lock:
-            sandbox = await get_sandbox(user_id=user_id)
+            sandbox = await get_sandbox(user_id=user_id, ctx=ctx)
             signed_url = sandbox.download_url(path=path, use_signature_expiration=file_timeout)
             return signed_url
+
 
 if __name__ == "__main__":
     try:
@@ -283,12 +303,91 @@ if __name__ == "__main__":
             else:
                 pass
         if is_enable_knowledge:
-            pass
+            if (env_dict.get("KNOWLEDGE_API_URL")
+                    and env_dict.get("KNOWLEDGE_API_TOKEN")
+                    and env_dict.get("KNOWLEDGE_API_MODEL_NAME")
+                    and env_dict.get("KNOWLEDGE_API_TIMEOUT")):
+                _chroma_client, _collection = init_chromadb_client()
+                knowledge_sync_from_json(collection=_collection)
+
+
+                async def get_knowledge_tool(
+                        ctx: Context,
+                        query: str,
+                        counts: int = 2
+                ) -> List[str]:
+                    """
+                    查询知识
+                    Args:
+                        query: 搜索关键词或者关键句
+                        counts: 返回相关的条目个数
+                    Returns:
+                        list, 最相关的条目
+                    """
+                    return await get_knowledge(
+                        collection=_collection,
+                        ctx=ctx,
+                        query=query,
+                        counts=counts
+                    )
+
+
+                mcp.add_tool(get_knowledge_tool)
+            else:
+                pass
 
         mcp.run(transport="stdio")
     except (KeyboardInterrupt, Exception) as e:
+        import traceback
+
+        traceback.print_exc()
         for sbx in _user_sandboxs.values():
             try:
                 sbx.close()
             except Exception as e:
-                pass
+                traceback.print_exc()
+
+# async def init_chromadb_client() -> Tuple[Any, chromadb.api.models.AsyncCollection.AsyncCollection]:
+#     chroma_client = await chromadb.AsyncClientCreator.create(
+#         settings=Settings(
+#             is_persistent = True,
+#             persist_directory=env_dict.get("knowledge_db_fir", "./test_knowledge.db")
+#         )
+#     )
+#
+#     collection = await chroma_client.get_or_create_collection(
+#         name="local_knowledge_base",
+#         metadata={"hnsw:space": "cosine"}  # 使用余弦相似度，更适合 OpenAI 嵌入
+#     )
+#     return chroma_client, collection
+
+# async def knowledge_sync_from_json(collection: chromadb.api.models.AsyncCollection.AsyncCollection):
+#     # use raw_jsons
+#     get_from_collection = await collection.get()
+#     collection_ids = set(get_from_collection["ids"])
+#     json_ids = set()
+#     file_jsons = {}  # 混合不同文件的json, key:id value:json
+#     for file_items in raw_jsons:
+#         for items in file_items:
+#             if items.get("enabled", True) and items.get("id", False):
+#                 json_ids.add(items.get("id"))
+#                 file_jsons[items.get("id")] = items
+#
+#     to_delete = collection_ids - json_ids
+#     if to_delete:
+#         await collection.delete(ids=list(to_delete))
+#
+#     to_add = json_ids - collection_ids
+#     to_add_ids = []
+#     to_add_texts = []
+#     to_add_metadata = []
+#     if to_add:
+#         for a_id in list(to_add):
+#             to_add_ids.append(a_id)
+#             to_add_texts.append(file_jsons[a_id]["text"])
+#             to_add_metadata.append(file_jsons[a_id]["metadata"])
+#     to_add_embeddings = await get_all_embedding(
+#         sems=1, txt_list=to_add_texts,
+#         url=env_dict.get("KNOWLEDGE_API_URL"), key=env_dict.get("KNOWLEDGE_API_TOKEN"),
+#         model_name=env_dict.get("KNOWLEDGE_API_MODEL_NAME"), timeout=env_dict.get("KNOWLEDGE_API_TIMEOUT"))
+#     await collection.upsert(ids=to_add_ids, documents=to_add_texts, embeddings=to_add_embeddings)
