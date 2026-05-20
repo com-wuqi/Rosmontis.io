@@ -22,9 +22,10 @@ jobs:
           fetch-depth: 0
 
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2024.3
+        uses: JetBrains/qodana-action@v2026.1
         with:
           pr-mode: false            # 分析整个项目，而非仅 PR 变更
+          linter: jetbrains/qodana-python-community:2026.1
           results-dir: ${{ runner.temp }}/qodana/results
         env:
           QODANA_LICENSE_ONLY_TOKEN: community   # 社区版免费令牌
