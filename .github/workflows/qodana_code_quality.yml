@@ -2,11 +2,6 @@ name: Qodana Code Quality
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-      - 'releases/*'
   pull_request:
 
 jobs:
@@ -16,7 +11,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: write
-      security-events: write
+      security-events: write      # 确保有权限上传 SARIF 到 Code Scanning
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,17 +20,14 @@ jobs:
           fetch-depth: 0
 
       - name: Run Qodana Scan
-        uses: JetBrains/qodana-action@v2026.1          # Action 版本：2026.1
+        id: qodana                     # 1. 设置步骤 ID
+        uses: JetBrains/qodana-action@v2026.1
         with:
-          pr-mode: false
-          args: --linter,jetbrains/qodana-jvm-community:2026.1   # Linter 镜像：Community for JVM 2026.1
-          results-dir: ${{ runner.temp }}/qodana/results
+          args: --linter jetbrains/qodana-python-community:2026.1
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
-      - name: 'Upload SARIF to GitHub Code Scanning'
-        if: success() || failure()
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v4     # 2. 升级到 v4
         with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana_report.sarif.json
-        
+          sarif_file: ${{ steps.qodana.outputs.sarif }} # 3. 使用动态输出路径
