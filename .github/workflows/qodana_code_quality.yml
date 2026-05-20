@@ -14,7 +14,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: write
-      security-events: write        # 用于上传 SARIF 到 GitHub Code Scanning
+      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,14 +24,14 @@ jobs:
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1
         with:
-          pr-mode: false            # 分析整个项目，而非仅 PR 变更
-          linter: jetbrains/qodana-python-community:2026.1
+          pr-mode: false
+          args: --image jetbrains/qodana-python-community:2026.1    # 使用 args 指定社区版镜像
           results-dir: ${{ runner.temp }}/qodana/results
         env:
-          QODANA_LICENSE_ONLY_TOKEN: community   # 社区版免费令牌
+          QODANA_LICENSE_ONLY_TOKEN: community
 
       - name: 'Upload SARIF to GitHub Code Scanning'
-        if: success() || failure()   # 即使扫描发现问题也上传结果
+        if: success() || failure()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana_report.sarif.json
