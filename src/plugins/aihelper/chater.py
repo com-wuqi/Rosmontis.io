@@ -25,6 +25,9 @@ _config_settings = {}
 
 _locks: Dict[int, asyncio.Lock] = {}
 
+_message_queue: asyncio.Queue = asyncio.Queue(maxsize=60)
+# 待处理的信息队列
+
 _superusers = get_driver().config.superusers
 _superusers = [int(k) for k in _superusers]
 
@@ -183,7 +186,7 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
             _raw_message.extend(_tool_prompts)
 
     # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
-    await start_ai.finish("收到喵~ 主人我们来聊天喵~")
+    await start_ai.finish("收到~")
 
 @stop_ai.handle()
 async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
@@ -196,7 +199,8 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            await stop_ai.finish("主人拜拜啦喵~")
+            # 这不是异常，为空时也可能被调用
+            await stop_ai.finish("拜拜~")
         if len(_Messages_dicts[session_id])>=0:
             #
             if raw is not None:
@@ -207,15 +211,19 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
             else:
                 # 不存在记录
                 _ = await save_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
-
         else:
             pass
 
-    await stop_ai.finish("主人拜拜啦喵~")
+    await stop_ai.finish("拜拜~")
 
 
 @ai_chat.handle()
 async def ai_chat_handle(event: MessageEvent, bot: Bot):
+    # 信息预处理，包含文件部分
+    # 将所有的信息加入上下文，但是不处理
+    # 可以在信息被AI处理之前，就是此处，注入向量检索的结果
+    # _raw_message.append 实现
+    is_a_file = False
     session_id,session_type = get_comments_id(event)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复
@@ -223,108 +231,51 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     if not msg:
         return
 
-    if is_valid_cq_code(msg):
-        logger.debug("is_valid_cq_code matched, is it a file ?")
-        msg = ""
-        for segment in event.message:
-            logger.debug("segment.data : {}".format(segment.data))
-            _read_file = await ai_file_reader(segment, bot)
-            logger.debug("_read_file : {}".format(_read_file))
-            msg = msg + "\n" + _read_file
-        # return  # 暂未完成
-
-    # 可以在信息被AI处理之前，就是此处，注入向量检索的结果
-    # _raw_message.append 实现
-
     lock = get_session_lock(session_id)
-    async with lock:  # 加锁保护消息列表和配置的读写
+    async with lock:  # 加锁保护消息列表的读写
+        if is_valid_cq_code(msg):
+            logger.debug("is_valid_cq_code matched, is it a file ?")
+            msg = ""
+            for segment in event.message:
+                logger.debug("segment.data : {}".format(segment.data))
+                await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
+                # block
+                is_a_file = True
+                _read_file = await ai_file_reader(segment, bot)
+                logger.debug("_read_file : {}".format(_read_file))
+                msg = msg + "\n" + _read_file
+
         try:
             _raw_message:list = _Messages_dicts[session_id]
         except KeyError:
-            logger.warning("empty message_list, skipped system prompts hook (for tools)")
+            logger.warning("empty message_list, but skipped system prompts hook (for tools)")
             _Messages_dicts[session_id] = []
             _raw_message: list = _Messages_dicts[session_id]
 
         if msg.split()[0] == "system":
             # 判断: 是system提示词+(私聊/群聊(管理员/所有者))
             if session_type == "PrivateMessageEvent":
-                await ai_chat.send("system hook by user: {}".format(event.user_id))
                 _raw_message.append({"role": "system", "content": f"{msg}"})
+                await ai_chat.finish("system hook by user: {}".format(event.user_id))
             elif event.sender.role == "admin" or event.sender.role == "owner":
-                await ai_chat.send("system hook by user: {}".format(event.user_id))
                 _raw_message.append({"role": "system", "content": f"{msg}"})
+                await ai_chat.finish("system hook by user: {}".format(event.user_id))
             else:
                 await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
 
         else:
             # 常规对话:
+            if is_a_file:
+                await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
+            # # debug:
+            # if msg == "file":
+            #     await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
+            # elif msg == "fileend":
+            #     await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
+            # else:
             _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
-
-        _event_setting = _config_settings[session_id]
-        # 指定配置文件
-
-        _counts = 0
-        while _counts < config.tools_max_once_calls:
-            _res = await send_messages_to_ai(
-                key=_event_setting.api_key,url=_event_setting.url,
-                model_name=_event_setting.model_name,
-                messages=_raw_message,
-                temperature=_event_setting.temperature
-            )
-            # 此处, ai可能没有尝试调用工具
-            if not _res.tool_calls:
-                _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
-                break
-
-            # 保存 工具调用请求的上下文
-            _assistant_message = {
-                "role": "assistant",
-                "content": _res.content,  # 可能为 None，保留即可
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        }
-                    }
-                    for tc in _res.tool_calls
-                ]
-            }
-            _raw_message.append(_assistant_message)
-            for tool_call in _res.tool_calls:
-                # 处理所有调用
-                function_name = tool_call.function.name
-                try:
-                    function_args = json.loads(tool_call.function.arguments)
-                except Exception as e:
-                    logger.warning("fail to load tool_call function_args: {}".format(e))
-                    _raw_message.append(
-                        {"tool_call_id": tool_call.id, "role": "tool", "content": "fail: invalid arguments"})
-                    continue
-
-                try:
-                    logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
-                    if function_name in checked_hooked_mcp_tools.keys():
-                        _result = await checked_hooked_mcp_tools[function_name](**function_args)
-                    else:
-                        _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
-                    logger.debug(f"MCP : function_name:{function_name} function_result:{_result}")
-                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
-                except Exception as e:
-                    logger.warning("fail to call tool : {}".format(e))
-                    _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": "fail"})
-
-            _counts +=1
-
-    # 判断是否被截断
-    if _res.tool_calls:
-        _reply = "已执行多次工具调用，但未生成完整回答"
-    else:
-        _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
-    await ai_chat.finish(_reply)
-
+            await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
+    return
 
 @remove_memory_ai.handle()
 async def remove_memory_ai_handle(event: MessageEvent):
@@ -401,11 +352,125 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
         else:
             await zip_db_ai.finish("db is empty, finished")
 
-# @_debug_message.handle()
-# async def debug_message_handle(event: MessageEvent):
-#     # logger.debug("MessageEvent.message_type: {}".format(event.message_type))
-#     logger.debug("MessageEvent.raw_message: {}".format(event.raw_message))
-#     return
+
+async def message_handle_loop(bot: Bot):
+    _last_active_time: dict[int, float] = dict()  # id-上次信息的时间 asyncio.get_running_loop().time()
+    _messages_counter: dict[int, int] = dict()  # id-当前信息数目
+    _message_type: dict[int, str] = dict()  # id-会话类型
+    _is_force_wait: dict[int, bool] = dict()  # id-当前信息是否强制等待，不处理
+
+    async def handle_merge():
+        handle_message_list: list[tuple[int, str]] = []
+        now = asyncio.get_running_loop().time()
+        _res = None
+        for s_id, s_type in _message_type.items():
+            number_of_msg = _messages_counter[s_id]
+            delt_time = now - _last_active_time[s_id]
+            if number_of_msg > 0:
+                if delt_time >= config.message_queue_timeout or number_of_msg >= config.message_queue_max_size:
+                    if not _is_force_wait.get(s_id, False):
+                        handle_message_list.append((s_id, s_type))
+
+        if len(handle_message_list) > 0:
+            logger.debug(f"need to handle: {handle_message_list}")
+
+        for _session_id, _session_type in handle_message_list:
+            lock = get_session_lock(_session_id)
+            _event_setting = _config_settings[_session_id]
+            # 指定配置文件
+            _raw_message: list = _Messages_dicts[_session_id]
+            async with lock:
+                _counts = 0
+                while _counts < config.tools_max_once_calls:
+                    _res = await send_messages_to_ai(
+                        key=_event_setting.api_key, url=_event_setting.url,
+                        model_name=_event_setting.model_name,
+                        messages=_raw_message,
+                        temperature=_event_setting.temperature
+                    )
+                    # 此处, ai可能没有尝试调用工具
+                    if not _res.tool_calls:
+                        _raw_message.append({"role": "assistant", "content": f"{_res.content}"})
+                        break
+
+                    # 保存 工具调用请求的上下文
+                    _assistant_message = {
+                        "role": "assistant",
+                        "content": _res.content,  # 可能为 None，保留即可
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": tc.type,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            }
+                            for tc in _res.tool_calls
+                        ]
+                    }
+                    _raw_message.append(_assistant_message)
+                    for tool_call in _res.tool_calls:
+                        # 处理所有调用
+                        function_name = tool_call.function.name
+                        try:
+                            function_args = json.loads(tool_call.function.arguments)
+                        except Exception as e:
+                            logger.warning("fail to load tool_call function_args: {}".format(e))
+                            _raw_message.append(
+                                {"tool_call_id": tool_call.id, "role": "tool", "content": "fail: invalid arguments"})
+                            continue
+
+                        try:
+                            logger.debug(f"MCP : function_name:{function_name} function_args:{function_args}")
+                            if function_name in checked_hooked_mcp_tools.keys():
+                                _result = await checked_hooked_mcp_tools[function_name](**function_args)
+                            else:
+                                _result = await mcp_manger.call_tool(tool_name=function_name, arguments=function_args)
+                            logger.debug(f"MCP : function_name:{function_name} function_result:{_result}")
+                            _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": str(_result)})
+                        except Exception as e:
+                            logger.warning("fail to call tool : {}".format(e))
+                            _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": "fail"})
+                    _counts += 1
+            # 不再持有锁
+            if _res.tool_calls:
+                # 判断是否被截断
+                _reply = "已执行多次工具调用，但未生成完整回答"
+            else:
+                _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
+
+            if _session_type == "GroupMessageEvent":
+                await bot.send_group_msg(group_id=_session_id, message=_reply)
+            elif _session_type == "PrivateMessageEvent":
+                await bot.send_private_msg(user_id=_session_id, message=_reply)
+
+            _messages_counter[_session_id] = 0
+            _last_active_time[_session_id] = now
+
+    while True:
+        try:
+            data = await asyncio.wait_for(
+                _message_queue.get(), timeout=config.message_queue_timeout - 0.2
+            )
+        except asyncio.TimeoutError:
+            # logger.debug("超时触发，执行合并检查")
+            await handle_merge()
+            continue
+
+        _s_id, _s_type = data["session"]
+        if data["type"] == "msg":
+            _message_type[_s_id] = _s_type
+            _last_active_time[_s_id] = asyncio.get_running_loop().time()
+            _messages_counter[_s_id] = _messages_counter.get(_s_id, 0) + 1
+        elif data["type"] == "file":
+            _message_type[_s_id] = _s_type
+            _is_force_wait[_s_id] = data["extra"]  # 当前有文件正在处理吗
+        else:
+            logger.warning(f"unknown message type: {data['type']}")
+
+        await handle_merge()
+
 
 # # 自动压缩逻辑(内存中, 缺少测试)
 # @scheduler.scheduled_job("interval", seconds=300, id="auto_zip_chat_in_memory")
