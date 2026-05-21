@@ -223,36 +223,47 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     # 将所有的信息加入上下文，但是不处理
     # 可以在信息被AI处理之前，就是此处，注入向量检索的结果
     # _raw_message.append 实现
-    is_a_file = False
+
     session_id,session_type = get_comments_id(event)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复
     msg = str(event.get_message()).strip()
     if not msg:
         return
+    if msg.startswith("debug"):
+        return
+
+    # start_ai 确保存在
+    _raw_message: list = _Messages_dicts[session_id]
+
+    is_a_block = False
+    image_message_index = -1
+
+    if is_valid_cq_code(msg):
+        await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
+        logger.debug(f"put \"extra\": True")
+        # block
+        is_a_block = True
+        logger.debug("is_valid_cq_code matched, is it a file ?")
+        msg = ""
+        for segment in event.message:
+            logger.debug("segment.data : {}".format(segment.data))
+            try:
+                _read_file = await ai_file_reader(segment, bot)
+                await asyncio.sleep(15)
+                logger.debug("_read_file : {}".format(_read_file))
+                msg = msg + "\n" + _read_file
+            except Exception as e:
+                logger.warning("读取失败")
+        if msg != "":
+            image_message_index = len(_raw_message)  # 当前信息的下一个位置
 
     lock = get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表的读写
-        if is_valid_cq_code(msg):
-            logger.debug("is_valid_cq_code matched, is it a file ?")
-            msg = ""
-            for segment in event.message:
-                logger.debug("segment.data : {}".format(segment.data))
-                await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
-                # block
-                is_a_file = True
-                _read_file = await ai_file_reader(segment, bot)
-                logger.debug("_read_file : {}".format(_read_file))
-                msg = msg + "\n" + _read_file
-
-        try:
-            _raw_message:list = _Messages_dicts[session_id]
-        except KeyError:
-            logger.warning("empty message_list, but skipped system prompts hook (for tools)")
-            _Messages_dicts[session_id] = []
-            _raw_message: list = _Messages_dicts[session_id]
-
-        if msg.split()[0] == "system":
+        # start_ai 确保存在
+        _raw_message: list = _Messages_dicts[session_id]
+        first_word = msg.split()[0] if msg.split() else ""
+        if first_word == "system" and not is_a_block:
             # 判断: 是system提示词+(私聊/群聊(管理员/所有者))
             if session_type == "PrivateMessageEvent":
                 _raw_message.append({"role": "system", "content": f"{msg}"})
@@ -262,19 +273,18 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
                 await ai_chat.finish("system hook by user: {}".format(event.user_id))
             else:
                 await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
-
         else:
             # 常规对话:
-            if is_a_file:
+            if is_a_block:
+                _raw_message[image_message_index:image_message_index] = [
+                    {"role": "user", "content": f"{event.user_id}: {msg}"},
+                ]  # 插入模式
+                await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
                 await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
-            # # debug:
-            # if msg == "file":
-            #     await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
-            # elif msg == "fileend":
-            #     await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
-            # else:
-            _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
-            await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
+                logger.debug(f"put \"extra\": False")
+            else:
+                _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
+                await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
     return
 
 @remove_memory_ai.handle()
@@ -357,18 +367,20 @@ async def message_handle_loop(bot: Bot):
     _last_active_time: dict[int, float] = dict()  # id-上次信息的时间 asyncio.get_running_loop().time()
     _messages_counter: dict[int, int] = dict()  # id-当前信息数目
     _message_type: dict[int, str] = dict()  # id-会话类型
-    _is_force_wait: dict[int, bool] = dict()  # id-当前信息是否强制等待，不处理
+    _is_force_wait: dict[int, int] = dict()  # id-当前信息是否强制等待，不处理
 
     async def handle_merge():
         handle_message_list: list[tuple[int, str]] = []
         now = asyncio.get_running_loop().time()
         _res = None
         for s_id, s_type in _message_type.items():
-            number_of_msg = _messages_counter[s_id]
+            if _messages_counter.get(s_id) is None or _last_active_time.get(s_id) is None:
+                continue
+            number_of_msg = _messages_counter.get(s_id, 0)
             delt_time = now - _last_active_time[s_id]
             if number_of_msg > 0:
                 if delt_time >= config.message_queue_timeout or number_of_msg >= config.message_queue_max_size:
-                    if not _is_force_wait.get(s_id, False):
+                    if _is_force_wait.get(s_id, 0) <= 0:
                         handle_message_list.append((s_id, s_type))
 
         if len(handle_message_list) > 0:
@@ -379,7 +391,11 @@ async def message_handle_loop(bot: Bot):
             _event_setting = _config_settings[_session_id]
             # 指定配置文件
             _raw_message: list = _Messages_dicts[_session_id]
-            async with lock:
+            try:
+                await asyncio.wait_for(lock.acquire(), timeout=config.message_queue_timeout / 2)
+            except asyncio.TimeoutError:
+                continue
+            try:
                 _counts = 0
                 while _counts < config.tools_max_once_calls:
                     _res = await send_messages_to_ai(
@@ -433,10 +449,18 @@ async def message_handle_loop(bot: Bot):
                             logger.warning("fail to call tool : {}".format(e))
                             _raw_message.append({"tool_call_id": tool_call.id, "role": "tool", "content": "fail"})
                     _counts += 1
+                if _counts >= config.tools_max_once_calls:
+                    logger.warning("Too many tool calls :(")
+            except Exception as e:
+                logger.error("failed : {}".format(e))
+                import traceback
+                traceback.print_exc()
+            finally:
+                lock.release()
             # 不再持有锁
-            if _res.tool_calls:
-                # 判断是否被截断
-                _reply = "已执行多次工具调用，但未生成完整回答"
+            if _res is None:
+                logger.error("未完成一次完整的对话")
+                _reply = "None"
             else:
                 _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
 
@@ -449,27 +473,39 @@ async def message_handle_loop(bot: Bot):
             _last_active_time[_session_id] = now
 
     while True:
-        try:
-            data = await asyncio.wait_for(
-                _message_queue.get(), timeout=config.message_queue_timeout - 0.2
-            )
-        except asyncio.TimeoutError:
-            # logger.debug("超时触发，执行合并检查")
+        datas = []
+        while not _message_queue.empty():
+            try:
+                _data = _message_queue.get_nowait()
+                datas.append(_data)
+            except asyncio.QueueEmpty:
+                break
+
+        if len(datas) == 0:
             await handle_merge()
-            continue
+            await asyncio.sleep(config.message_queue_timeout / 2)
 
-        _s_id, _s_type = data["session"]
-        if data["type"] == "msg":
-            _message_type[_s_id] = _s_type
-            _last_active_time[_s_id] = asyncio.get_running_loop().time()
-            _messages_counter[_s_id] = _messages_counter.get(_s_id, 0) + 1
-        elif data["type"] == "file":
-            _message_type[_s_id] = _s_type
-            _is_force_wait[_s_id] = data["extra"]  # 当前有文件正在处理吗
-        else:
-            logger.warning(f"unknown message type: {data['type']}")
+        try:
+            for data in datas:
+                logger.debug("_message_queue.get() : {}".format(data))
+                _s_id, _s_type = data["session"]
+                _message_type[_s_id] = _s_type
+                _last_active_time[_s_id] = asyncio.get_running_loop().time()
+                if data["type"] == "msg":
+                    _messages_counter[_s_id] = _messages_counter.get(_s_id, 0) + 1
+                elif data["type"] == "file":
+                    if data["extra"]:
+                        _is_force_wait[_s_id] = _is_force_wait.get(_s_id, 0) + 1  # 当前有文件
+                    else:
+                        _is_force_wait[_s_id] = _is_force_wait.get(_s_id, 0) - 1  # 当前没有文件
+                else:
+                    logger.warning(f"unknown message type: {data['type']}")
+            await handle_merge()
+        except Exception as e:
+            logger.error("fail to handle message : {}".format(e))
+            import traceback
+            traceback.print_exc()
 
-        await handle_merge()
 
 
 # # 自动压缩逻辑(内存中, 缺少测试)
