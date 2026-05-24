@@ -17,7 +17,7 @@ require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
-from src.plugins.public_apis import TokenBucket, download_file
+from src.plugins.public_apis import TokenBucket, download_file, global_progress_pool
 
 _token_bucket = TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
 
@@ -96,14 +96,14 @@ def encode_image(image_path):
 async def encode_image_async(image_path):
     loop = asyncio.get_event_loop()
     func = functools.partial(encode_image, image_path)
-    result = await loop.run_in_executor(None, func)
+    result = await loop.run_in_executor(global_progress_pool, func)
     return result
 
 
 async def compress_image_async(input_path, output_path, **kwargs):
     loop = asyncio.get_running_loop()
     func = functools.partial(compress_image, input_path, output_path, **kwargs)
-    result = await loop.run_in_executor(None, func)
+    result = await loop.run_in_executor(global_progress_pool, func)
     return result
 
 
