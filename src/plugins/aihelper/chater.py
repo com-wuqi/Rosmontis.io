@@ -8,6 +8,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Private
 from nonebot.internal.params import ArgPlainText
 
 from .system_prompts import tool_system_prompts_list
+from ..ai_file_reader import get_file_from_event
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
@@ -237,29 +238,26 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     if msg.startswith("debug"):
         return
 
-    # start_ai 确保存在
     _raw_message: list = _Messages_dicts[session_id]
-
     is_a_block = False
     image_message_index = -1
+    lock = await get_session_lock(session_id)
 
     if is_valid_cq_code(msg):
-        is_a_block = True
-        image_message_index = len(_raw_message)  # 当前信息的下一个位置
-        # block
-        logger.debug("is_valid_cq_code matched, is it a file ?")
-        msg = ""
-        await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
-        logger.debug(f"put \"extra\": True")
-        for segment in event.message:
-            logger.debug("segment.data : {}".format(segment.data))
-            try:
-                _read_file = await ai_file_reader(segment, bot)
-                msg = msg + "\n" + _read_file
-            except Exception as e:
-                logger.warning(f"读取失败: {e}")
+        _counter, _msg = await get_file_from_event(event=event, bot=bot)
+        if _counter != 0:
+            # 信息是cq_code, 而且有文件读取成功或不支持
+            await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
+            logger.debug(f"put \"extra\": True")
+            is_a_block = True
+            async with lock:
+                image_message_index = len(_raw_message)  # 当前信息的下一个位置
+                _raw_message.append({"role": "user", "content": f"{event.user_id}: image is processing"})  # 留空，占位
+            logger.debug("is_valid_cq_code matched, is it a file ?")
+            msg = _msg
+        else:
+            logger.warning(f"read a cq code {msg} , but not find a file")
 
-    lock = await get_session_lock(session_id)
     async with lock:  # 加锁保护消息列表的读写
         # start_ai 确保存在
         _raw_message: list = _Messages_dicts[session_id]
@@ -275,15 +273,14 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             else:
                 await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
         else:
-            # 常规对话:
             if is_a_block:
-                _raw_message[image_message_index:image_message_index] = [
-                    {"role": "user", "content": f"{event.user_id}: {msg}"},
-                ]  # 插入模式
+                # 含有文件
+                _raw_message[image_message_index] = {"role": "user", "content": f"{event.user_id}: {msg}"}
                 await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
                 await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
                 logger.debug(f"put \"extra\": False")
             else:
+                # 常规对话:
                 _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
                 await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
     return
@@ -370,6 +367,7 @@ async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bo
     _event_setting = _config_settings[_session_id]
     # 指定配置文件
     _raw_message: list = _Messages_dicts[_session_id]
+    _res = None
     async with lock:  #
         try:
             _counts = 0
@@ -480,6 +478,9 @@ class MessageHandleWorkers:
                 if delt_time >= config.message_queue_timeout or number_of_msg >= config.message_queue_max_size:
                     if self._is_force_wait.get(s_id, 0) <= 0:
                         try:
+                            if not _message_queue.empty():
+                                # 有信息，中断处理
+                                break
                             self.need_to_handle_queue.put_nowait((s_id, s_type))
                             self._messages_counter[s_id] = 0
                             self._last_active_time[s_id] = asyncio.get_running_loop().time()

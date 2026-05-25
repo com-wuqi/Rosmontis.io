@@ -2,6 +2,7 @@ from typing import List, Dict, Callable
 
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot
+from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.plugin import PluginMetadata
 
@@ -25,6 +26,20 @@ message_matcher: Dict[Callable, Callable] = {
 message_matcher_switch: List[bool] = [
     config.is_enable_image
 ]
+
+
+async def get_file_from_event(event: MessageEvent, bot: Bot) -> tuple[int, str]:
+    _msg = ""
+    _counter = 0
+    for segment in event.message:
+        logger.debug("segment.data : {}".format(segment.data))
+        try:
+            _read_file = await ai_file_reader(segment, bot)
+            _msg = _msg + "\n" + _read_file
+            _counter += 1
+        except Exception as e:
+            logger.warning(f"读取失败: {e}")
+    return _counter, _msg
 
 
 async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
