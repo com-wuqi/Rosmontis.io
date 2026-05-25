@@ -5,6 +5,7 @@ import mimetypes
 import os
 import re
 import time
+import traceback
 
 from PIL import Image
 from nonebot import require
@@ -133,6 +134,8 @@ async def read_image(file_name: str, file_url: str) -> str | None:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": "请准确，详细，客观的描述图片里的所有内容"},
+                        {"type": "text", "text": "要求：直接输出最终描述结果，不要输出任何思考过程或解释。"},
+                        {"type": "text", "text": "输出格式：纯文本，无需分段标题。"},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -144,16 +147,23 @@ async def read_image(file_name: str, file_url: str) -> str | None:
 
                 }
             ],
-            temperature=1.0
+            temperature=1.0,
         )
         _return = chat_completion.choices[0].message
-        # logger.debug(f"read_image: {_return.content}")
-        return _return.content
+        if not _return or not _return.content:
+            logger.warning(
+                f"返回空内容，"
+                f"finish_reason: {getattr(chat_completion.choices[0], 'finish_reason', 'unknown')} | "
+                f"完整响应: {chat_completion.model_dump()}")
+            raise RuntimeError("模型未返回有效描述内容")
+        _msg = _return.content
+        logger.debug(f"read_image: {_msg}")
+        return _msg
 
     except Exception as e:
         logger.error(e)
+        traceback.print_exc()
     finally:
         image_path.unlink(missing_ok=True)
         compressed_image_path.unlink(missing_ok=True)
-
     return None

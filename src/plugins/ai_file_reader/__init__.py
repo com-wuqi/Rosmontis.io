@@ -59,7 +59,12 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
                 file_info = await bot.call_api("get_private_file_url", file_id=file_id)
                 file_url = file_info["url"]
             _result_msg = await value(file_name, file_url)
-            result_msg = _result_msg if _result_msg else result_msg
+            # logger.debug(f"_result_msg: {_result_msg}")
+            # logger.debug(f"_result_msg type: {type(_result_msg)}")
+            if _result_msg is None:
+                logger.warning(f"_result_msg is None with file {file_name}")
+            else:
+                result_msg = _result_msg
             break
 
     return result_msg

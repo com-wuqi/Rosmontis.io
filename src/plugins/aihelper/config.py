@@ -9,6 +9,7 @@ class ScopedConfig(BaseModel):
     api_timeout: int = 300  # api 超时限制
     message_queue_timeout: int = 1  # 单个对话超时
     message_queue_max_size: int = 5  # 单个会话最长缓存
+    max_workers: int = 10  # 最大worker数，过多会丢弃
 
 
 class Config(BaseModel):

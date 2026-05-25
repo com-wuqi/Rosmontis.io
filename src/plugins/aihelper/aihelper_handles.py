@@ -5,7 +5,7 @@ from typing import List, Dict
 
 import aiofiles
 from nonebot.log import logger
-from openai import AsyncOpenAI, RateLimitError, APIConnectionError, AuthenticationError, Timeout, APIStatusError
+from openai import AsyncOpenAI, RateLimitError, APIConnectionError, AuthenticationError, APITimeoutError, APIStatusError
 from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryCallState
@@ -61,7 +61,7 @@ def _on_before(retry_state: RetryCallState):
     else:
         logger.debug(
             f"send_messages_to_ai | "
-            "first call"
+            "first call, no retry"
         )
 
 
@@ -99,7 +99,7 @@ async def get_model_names(key:str,url:str) -> List[str]:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=30),  # 指数退避
-    retry=retry_if_exception_type((RateLimitError, APIConnectionError, Timeout)),
+    retry=retry_if_exception_type((RateLimitError, APIConnectionError, APITimeoutError)),
     before=_on_before,
     after=_on_after,
     reraise=True,  # 抛出原始异常

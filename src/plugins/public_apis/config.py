@@ -7,6 +7,7 @@ class ScopedConfig(BaseModel):
     upload_ws_token: str = ""  # token
     is_enable_upload: bool = False
     global_progress_pool_max_workers: int = 2
+    global_thread_pool_max_workers: int = 2
 
 
 class Config(BaseModel):
