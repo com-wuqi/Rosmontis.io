@@ -1,221 +1,367 @@
-# Rosmontis.io
+# Rosmontis - 现代化AI机器人框架
 
-基于 nonebotv2 + onebotv11 的 跨平台的 开源机器人实现
+![License](https://img.shields.io/github/license/com-wuqi/Rosmontis.io)
+![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
+![NoneBot](https://img.shields.io/badge/NoneBot-v2.x-green)
+![OneBot](https://img.shields.io/badge/OneBot-v11-yellow)
 
-## 已经实现
+**Rosmontis**（迷迭香）是一个基于 **NoneBot v2** 框架和 **OneBot v11** 协议的现代化、可扩展的开源机器人实现。项目名源于《明日方舟》中的干员。
 
-文档 [__init__.py](src/plugins/easyhelper/__init__.py)
+## ✨ 核心特性
 
-## 迁移
+### 🚀 现代化技术栈
 
-从旧版本迁移:
+- **Python 3.12+**: 最新的异步编程特性
+- **NoneBot 2.5+**: 高性能异步机器人框架
+- **SQLAlchemy 2.0 + Alembic**: 强大的ORM和数据库迁移
+- **MCP (Model Context Protocol)**: 先进的工具调用协议
 
-由于我们更新的提示词的添加, 您可能不得不执行 `ai remove` 并按照提示完成删除数据库内对话才能正常使用
+### 🤖 AI原生集成
 
-## 兼容性警告
+- **多模型支持**: OpenAI API标准兼容，支持自定义AI提供商
+- **MCP工具链**: 支持SSE、stdio、streamable-http三种通信方案
+- **文件智能处理**: 图像OCR、文档解析、多媒体处理
+- **代码沙箱**: E2B集成，安全执行用户代码
+- **知识库检索**: ChromaDB向量数据库支持
 
-> 请注意, OneBot 是一个已经脱轨且停滞的协议规范, 对 **大部分** 框架本身没有实质性约束。
+### 🎨 多媒体处理
 
-我们尽量遵守了大部分 OneBot 规范。在遇到无法实现或需要扩展的场景时, 会根据 **目前可用** 的信息提供方进行差异化实现,
-因此存在过时风险
+- **音乐服务**: 妖狐数据API集成，支持多平台音源
+- **图像处理**: Pillow集成，支持图片识别与处理
+- **TTS语音合成**: GPT-SoVITS、Qwen3-TTS支持
+- **文件上传**: 跨平台文件传输服务
 
-请参阅 [Compatibility_Warning.md](Compatibility_Warning.md)
+### 🔧 企业级特性
 
-请允许 我 [@com-wuqi](https://github.com/com-wuqi) 再次 "悼念" `go-cqhttp` 项目,
-这里引用一段评论, 来自: [go-cqhttp #2471](https://github.com/Mrs4s/go-cqhttp/issues/2471)
+- **Sentry监控**: 生产环境错误追踪
+- **APScheduler**: 分布式任务调度
+- **数据库支持**: MySQL + SQLite双引擎
+- **Docker部署**: 完整的容器化方案
+- **GitHub Actions**: 自动化CI/CD流水线
 
-> go-cqhttp 项目标志着 QQ 机器人的一个时代。
->
-> 我有幸亲眼见证了 go-cqhttp 从诞生到发展的所有历史节点。go-cqhttp 诞生时 CoolQ 还没有退场，那个时候机器人圈闭源横行。
-> 是 go-cqhttp (和 mirai) 推动了整个社区的开源化，并孵化出欣欣向荣的众多框架。
-> 作为一位开源开发者，我由衷的感谢 go-cqhttp 的每一位开发者为生态做出的贡献。
->
-> 这些年辛苦了。
+## 📁 项目结构
 
-## 手动部署 (推荐)
+```
+Rosmontis/
+├── src/plugins/              # 核心插件目录
+│   ├── aihelper/            # AI助手核心，对话管理
+│   ├── mcp_support/         # MCP协议支持，工具调用
+│   ├── ai_file_reader/      # 文件智能读取（OCR等）
+│   ├── yaohud/              # 妖狐数据API，多媒体处理
+│   ├── public_apis/         # 公开API服务，文件上传
+│   ├── self_build_tts/      # 自建TTS服务（实验性）
+│   ├── qzone_handle/        # QQ空间接口处理
+│   ├── hitokoto/            # 一言服务
+│   ├── easyhelper/          # 简易助手功能
+│   └── hooked_mcp_tools/    # MCP工具钩子
+├── migrations/              # 数据库迁移文件
+├── server/                  # 辅助服务器文件
+├── mcp_workdir/            # MCP工作目录
+├── cache/                   # 缓存目录
+├── data/                    # 数据目录
+├── .github/workflows/       # CI/CD配置
+├── docker-compose.yml       # Docker编排配置
+├── Dockerfile               # Docker镜像构建
+├── bot.py                   # 机器人入口文件
+├── pyproject.toml           # 项目配置
+├── requirements.txt         # Python依赖
+├── .env.prod                # 生产环境配置
+└── README.md                # 项目说明
+```
 
-### 准备环境
+## 🚀 快速开始
 
-本项目依赖 onebotv11 , 理论上任何支持 onebotv11 的信息提供方都可以接入
+另附旧版教程，更详细但是更复杂 [extra_README.md](extra_README.md)
 
-ai相关: openai标准库实现, 支持自定义 MCP 服务 (支持sse, stdio, streamable-http)
+### 方式一：手动部署 (推荐)
 
-建议使用 `conda` 并为项目配置专用的虚拟环境, 注意需要 `python3>=3.12`, 我们测试时使用的是 3.14.2
+1. **环境要求**
+   - Python 3.12+
+   - Node.js 18+ (用于MCP支持)
+   - MySQL 8.0+ 或 SQLite
+   - Napcat 实例 (请参考`https://napneko.github.io/`)
 
-MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
+2. **创建虚拟环境**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Linux/macOS
+   # 或 venv\Scripts\activate  # Windows
+   ```
 
-复制文件 [src/plugins/mcp_support/example.mcp_config.py](src/plugins/mcp_support/example.mcp_config.py) 为
-`src/plugins/mcp_support/mcp_config.py`
+3. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-如果不使用, 进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除依赖 `nodejs` 的服务器
+4. **数据库初始化**
+   ```bash
+   # MySQL示例
+   CREATE DATABASE data CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+   ```bash
+   vim .env.prod
+   # 编辑 .env.prod 文件，配置数据库连接, Napcat连接等
+   ```
 
-### 安装项目依赖
+   ```bash
+   # 应用数据库迁移
+   nb orm upgrade
+   ```
 
-准备虚拟环境, 激活虚拟环境不再赘述,
+5. **配置MCP**
+   ```bash
+   cp src/plugins/mcp_support/example_mcp_config.py src/plugins/mcp_support/mcp_config.py
+   # 编辑 mcp_config.py 配置MCP服务器
+   ```
+
+6. **启动机器人**
+   ```bash
+   nb run
+   ```
+
+### 方式二：Docker部署 (缺少测试)
+
+1. **克隆项目**
+   ```bash
+   git clone https://github.com/com-wuqi/Rosmontis.io.git
+   cd Rosmontis.io
+   ```
+
+2. **配置环境变量**
+   ```bash
+   vim .env.prod
+   # 编辑 .env.prod 文件，配置数据库连接等
+   ```
+
+3. **启动服务**
+   ```bash
+   docker-compose --env-file .env.prod up -d
+   ```
+
+4. **配置NapCatQQ**
+   - 访问 `http://127.0.0.1:6099` (NapCat管理界面)
+   - 添加WebSocket服务器配置：
+      - Host: 0.0.0.0
+      - Port: 3001
+      - Token: 与 `.env.prod` 中的 `ONEBOT_ACCESS_TOKEN` 一致
+
+## 🔧 功能配置
+
+### AI配置
+
+添加AI供应商：
 
 ```bash
-pip install -r requirements.txt
+# 在聊天窗口中执行
+/ai cf add
+# 按照向导配置AI API密钥和模型
 ```
 
-如果需要使用自建TTS支持, 然后执行 `pip install gradio_client`
+支持的AI供应商：
 
-使用 `nb plugin` 更新所需插件
+- OpenAI系列（GPT-4, GPT-3.5）
+- 通义千问
+- 智谱AI
+- 自定义供应商
 
-必要时参考 https://nonebot.dev/docs/quick-start 安装 `pipx` 和 `nonebot` 本体
+### 插件配置
 
-依赖安装问题请开 `discussion`
+编辑 `.env.prod` 文件配置插件：
 
-### 准备数据库
+(这里仅仅截取一部分～)
 
-推荐使用 mysql + aiomysql ,
+```env
+# AI助手总开关
+AIHELPER__IS_ENABLE=true
 
-根据配置文件中的数据库名称(mysql需要)(默认为data), 需要登录后创建空数据库
+# 文件读取能力
+AI_FILE_READER__IS_ENABLE=true
 
-```sql
-CREATE
-DATABASE data
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+# 妖狐数据API
+YAOHUD__IS_ENABLE=true
+YAOHUD__API_KEY=your_key
+YAOHUD__API_SECRET=your_secret
+
+# MCP支持
+MCPSUPPORT__IS_ENABLE=true
+
+# 文件上传服务
+PUBLICAPI__IS_ENABLE_UPLOAD=true
 ```
 
-支持 sqlite , 需要修改 `pymysql`为 `aiosqlite`, 例如, 注意修改其他配置项
-
-```dotenv
-SQLALCHEMY_DATABASE_URL=sqlite+aiosqlite:///data.db
-APSCHEDULER_CONFIG={"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"sqlite:///data.db","tablename":"apscheduler_jobs"}}}
-```
-
-安装数据库不再赘述, 记得创建空数据库用于初始化即可
+### 插件管理
 
 ```bash
-nb orm upgrade # 第一次使用需要执行, 数据库更新之后也需要
+# 查看已安装插件
+nb plugin list
+
+# 安装新插件
+nb plugin install <plugin-name>
+
+# 卸载插件
+nb plugin uninstall <plugin-name>
 ```
 
-### 调整配置文件
+## 📚 详细文档
 
-适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
-
-### 然后?
-
-到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
-
-## docker 手动构建
-
-*不支持自建TTS和一部分MCP服务器*
-
-克隆仓库, 进入目录,
-
-复制文件 [src/plugins/mcp_support/example.mcp_config.py](src/plugins/mcp_support/example.mcp_config.py) 为
-`src/plugins/mcp_support/mcp_config.py`
-
-请删除 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 依赖 `nodejs` 的服务器
-
-注意, 容器部署**一般**没办法通过 `stdio` 建立连接, 所以需要修改 [docker-compose.yml](docker-compose.yml) 在容器内部署 或者
-修改网络来访问其他服务器
+### 数据库管理
 
 ```bash
-sudo docker-compose --env-file .env.prod up -d
+# 创建新迁移
+nb orm revision --autogenerate -m "描述"
+
+# 应用迁移
+nb orm upgrade
+
+# 回滚迁移
+nb orm downgrade -1
+
+# 查看迁移历史
+nb orm history
 ```
 
-适当修改 [.env.prod](.env.prod) ,[mcp_config.py](src/plugins/mcp_support/mcp_config.py)
+### 任务调度
+
+通过APScheduler支持定时任务：
+
+```python
+from nonebot_plugin_apscheduler import scheduler
+from nonebot.adapters.onebot.v11 import Bot
+
+
+@scheduler.scheduled_job("cron", hour=8)
+async def daily_reminder(bot: Bot):
+   await bot.send_group_msg(group_id=123456, message="早安！")
+```
+
+### 错误监控
+
+集成Sentry进行错误追踪：
+
+1. 注册 [Sentry](https://sentry.io/) 账户
+2. 创建Python项目
+3. 在 `.env.prod` 中配置 `SENTRY_DSN`
+
+## 🛠️ 开发指南
+
+### 创建新插件
 
 ```bash
-sudo docker logs -f napcat
+nb plugin create
 ```
-手动登录, 然后进入webui(token在上面)(一般是 http://127.0.0.1:6099), 添加 网络配置
 
-类型是ws服务器, 名称随意,
+然后按照指导完成即可
 
-Host: 0.0.0.0 ,
-
-Port: 3001 ,
-
-心跳间隔：10000 （不修改可能导致反复连接超时）
-
-选择启用 ,
-
-token: 和 .env.prod 的 ONEBOT_ACCESS_TOKEN和NAPCATAPI__UPLOAD_WS_TOKEN 相同
+### 代码规范
 
 ```bash
-sudo docker logs -f rosbot # 检查是否连接成功
+# 代码格式化
+ruff format .
+
+# 代码检查
+ruff check .
+
+# 类型检查
+pyright .
 ```
 
-### 然后?
-
-到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
-
-## docker 使用构建产物
-
-windows用户请考虑不用docker部署或者手动打包, 构建产物不含 windows 支持
-
-注意, 构建产物不一定包含最新的功能(仅构建release分支), 可以 `fork` 然后手动触发 `action` 构建
-
-自己 `fork` 请修改 `.env.prod` 的 `#IMAGE=` , 取消注释并改为你的构建产物地址
-
-打开文件 [docker-compose.yml](docker-compose.yml) , 找到
-
-```yml
-services:
-  # 机器人服务
-  rosbot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # image: ${IMAGE:-ghcr.io/com-wuqi/rosmontis.io:latest}
-    container_name: rosbot
-    restart: unless-stopped
-```
-
-修改为:
-
-```yml
-services:
-  # 机器人服务
-  rosbot:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    image: ${IMAGE:-ghcr.io/com-wuqi/rosmontis.io:latest}
-    container_name: rosbot
-    restart: unless-stopped
-```
-
-注意前往: https://github.com/com-wuqi/Rosmontis.io/pkgs/container/rosmontis.io 检查标签,
-将 `latest` 换为最新的构建
-
-然后进行上文的 `docker 手动构建` 过程 .
-
-## 依赖导出方式:
+### 测试（施工中）
 
 ```bash
-pip-chill > requirements.txt
+# 运行单元测试
+pytest tests/
+
+# 覆盖率测试
+pytest --cov=src tests/
 ```
 
-## 引用的其他项目
+## 🔍 故障排除
 
-https://github.com/NapNeko/NapCatQQ
+### 常见问题
 
-https://github.com/gfhdhytghd/qzone-toolkit
+1. **数据库连接失败**
+   - 检查MySQL服务状态
+   - 确认数据库用户权限
+   - 验证连接字符串格式
 
-https://github.com/sansenjian/quick-e2b-sandbox
+2. **NapCat连接失败**
+   - 检查WebSocket服务器配置
+   - 确认端口3001未被占用
+   - 验证Token一致性
 
-## 自建TTS支持 (实验性功能, 不稳定)
+3. **AI API调用失败**
+   - 检查API密钥有效性
+   - 确认网络代理配置
+   - 验证模型名称正确性
 
-[TTS_Support.md](TTS_Support.md)
+4. **插件加载失败**
+   - 检查插件依赖安装
+   - 确认配置文件格式
+   - 查看日志文件错误信息
 
-## 小工具
+### 日志查看
 
-[compare_env.py](compare_env.py) : 比较配置文件的环境变量条目是否相同
+```bash
+# Docker部署
+docker logs -f rosbot
 
-## Tip
+# 手动部署
+tail -f logs/bot.log
 
-`src/plugins/aihelper/md_prompts` 里面所有的markdown文件都会作为AI提示词
+# 详细调试
+LOG_LEVEL=DEBUG python bot.py
+```
 
-`requirements.txt` 内部包含了这个文件的生成方式
+## 🤝 贡献指南
 
-`pip install --upgrade -r requirements.txt` 可以根据 `requirements.txt` 更新依赖
+### 开发流程
 
-## 许可证
+1. **Fork项目**
+2. **创建功能分支**
+   ```bash
+   git checkout -b feat/new-feature
+   ```
+3. **提交代码**
+   ```bash
+   git add .
+   git commit -m "feat: 添加新功能"
+   ```
+4. **推送到远程**
+   ```bash
+   git push origin feat/new-feature
+   ```
+5. **创建Pull Request**
+
+### 提交规范
+
+- `feat`: 新功能
+- `fix`: bug修复
+- `docs`: 文档更新
+- `style`: 代码格式
+- `refactor`: 代码重构
+- `test`: 测试相关
+- `chore`: 构建过程或辅助工具
+
+## 📄 许可证
 
 本项目采用 [MIT 许可证](LICENSE) 进行许可。
+
 除了主要作者外，本项目还受益于众多贡献者的努力，详见 [CONTRIBUTORS](CONTRIBUTORS) 文件。
+
+## 🔗 相关项目
+
+- [NapCatQQ](https://github.com/NapNeko/NapCatQQ) - QQ协议实现
+- [qzone-toolkit](https://github.com/gfhdhytghd/qzone-toolkit) - QQ空间工具
+- [quick-e2b-sandbox](https://github.com/sansenjian/quick-e2b-sandbox) - 代码沙箱
+
+## 📞 支持与联系
+
+- **Issues**: [GitHub Issues](https://github.com/com-wuqi/Rosmontis.io/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/com-wuqi/Rosmontis.io/discussions)
+- **作者**: [@com-wuqi](https://github.com/com-wuqi)
+
+---
+
+**🔄 持续更新中...** 欢迎Star和Fork，一起构建更好的Rosmontis！
+
+> *"让智能在指尖绽放。"*
