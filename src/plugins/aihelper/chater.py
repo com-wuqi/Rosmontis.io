@@ -476,22 +476,24 @@ class MessageHandleWorkers:
             delt_time = asyncio.get_running_loop().time() - self._last_active_time[s_id]
             if number_of_msg > 0:
                 if delt_time >= config.message_queue_timeout or number_of_msg >= config.message_queue_max_size:
-                    if self._is_force_wait.get(s_id, 0) <= 0:
-                        try:
-                            if not _message_queue.empty():
-                                # 有信息，中断处理
-                                break
+                    try:
+                        lock = await self.get_is_force_wait_lock(s_id)
+                        async with lock:
+                            # 检查是否已经在等待处理（防止重复入队）
+                            if self._is_force_wait.get(s_id, 0) > 0:
+                                continue
+                            self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) + 1
                             self.need_to_handle_queue.put_nowait((s_id, s_type))
                             self._messages_counter[s_id] = 0
                             self._last_active_time[s_id] = asyncio.get_running_loop().time()
-                        except asyncio.QueueFull as e:
-                            logger.warning("fail to handle message : {}".format(e))
-                            logger.warning("过多未处理的会话，自动丢弃最新的会话，被丢弃的会话会在下一个循环时被重新考虑")
-                        except asyncio.QueueShutDown as e:
-                            logger.warning("fail to handle message : {}".format(e))
-                        except Exception as e:
-                            logger.warning("fail to handle message : {}".format(e))
-                            traceback.print_exc()
+                    except asyncio.QueueFull as e:
+                        logger.warning("fail to handle message : {}".format(e))
+                        logger.warning("过多未处理的会话，自动丢弃最新的会话，被丢弃的会话会在下一个循环时被重新考虑")
+                    except asyncio.QueueShutDown as e:
+                        logger.warning("fail to handle message : {}".format(e))
+                    except Exception as e:
+                        logger.warning("fail to handle message : {}".format(e))
+                        traceback.print_exc()
 
         if not self.need_to_handle_queue.empty():
             logger.debug(f"need to handle: {self.need_to_handle_queue.qsize()}")
@@ -499,16 +501,16 @@ class MessageHandleWorkers:
     async def _single_worker(self):
         try:
             s_id, s_type = await self.need_to_handle_queue.get()
+            lock = await self.get_is_force_wait_lock(s_id)
             try:
-                lock = await self.get_is_force_wait_lock(s_id)
-                async with lock:
-                    self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) + 1
-                    await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
-                    self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) - 1
+                await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
             except Exception as e:
                 logger.error("fail to handle message: {}".format(e))
-
                 traceback.print_exc()
+            finally:
+                async with lock:
+                    current = self._is_force_wait.get(s_id, 0)
+                    self._is_force_wait[s_id] = max(0, current - 1)
         except asyncio.CancelledError:
             # logger.debug("_single_worker cancelled")
             pass
@@ -549,7 +551,7 @@ class MessageHandleWorkers:
                     logger.error("fail to handle message: {}".format(e))
 
                     traceback.print_exc()
-                await asyncio.sleep(config.message_queue_timeout / 2)
+                await asyncio.sleep(1 / 2)
                 continue
 
             try:
@@ -566,7 +568,8 @@ class MessageHandleWorkers:
                             if data["extra"]:
                                 self._is_force_wait[_s_id] = self._is_force_wait.get(_s_id, 0) + 1  # 当前有文件
                             else:
-                                self._is_force_wait[_s_id] = self._is_force_wait.get(_s_id, 0) - 1  # 当前没有文件
+                                current = self._is_force_wait.get(_s_id, 0)
+                                self._is_force_wait[_s_id] = max(0, current - 1)  # 当前没有文件，防止负数
                     else:
                         logger.warning(f"unknown message type: {data['type']}")
                 await self.handle_merge()
