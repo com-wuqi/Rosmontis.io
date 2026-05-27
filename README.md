@@ -1,4 +1,4 @@
-# Rosmontis - 现代化AI机器人框架
+# Rosmontis - 现代化AI机器人
 
 ![License](https://img.shields.io/github/license/com-wuqi/Rosmontis.io)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
