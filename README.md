@@ -231,6 +231,7 @@ from nonebot.adapters.onebot.v11 import Bot
 
 @scheduler.scheduled_job("cron", hour=8)
 async def daily_reminder(bot: Bot):
+   # 这里的bot需要想办法从外部获取
    await bot.send_group_msg(group_id=123456, message="早安！")
 ```
 
