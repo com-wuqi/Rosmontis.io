@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Dict, Literal
+from typing import Literal
 
 
 @dataclass
@@ -10,18 +10,18 @@ class McpServerConfig:
     # 通信方案
 
     # stdio config
-    command: Optional[str] = None  # 必须
-    args: Optional[list] = None
-    env: Optional[Dict[str, str]] = None
+    command: str | None = None  # 必须
+    args: list | None = None
+    env: dict[str, str] | None = None
 
     # SSE / Streamable HTTP config
-    url: Optional[str] = None  # 必须
+    url: str | None = None  # 必须
 
     # 通用配置
     timeout: int = 60  # 可选, client 超时控制
-    prefix: Optional[str] = None
+    prefix: str | None = None
     # 私有前缀, 用于区分同名工具
-    headers: Optional[Dict[str, str]] = None  # 认证头等
+    headers: dict[str, str] | None = None  # 认证头等
 
 
 # 以下是配置项
