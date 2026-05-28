@@ -14,7 +14,8 @@ async def acg_adaptive_handle():
     if path_jpg == -1:
         await acg_adaptive.finish("failed")
     else:
-        await acg_adaptive.finish(MessageSegment.image(path_jpg))
+        _msg = MessageSegment("file", {"file": f"file://{path_jpg}"})
+        await acg_adaptive.finish(_msg)
 
 
 @acg_ai.handle()
@@ -24,7 +25,8 @@ async def acg_ai_handle():
     if path_jpg == -1:
         await acg_ai.finish("failed")
     else:
-        await acg_ai.finish(MessageSegment.image(path_jpg))
+        _msg = MessageSegment("file", {"file": f"file://{path_jpg}"})
+        await acg_ai.finish(_msg)
 
 
 @acg_r18.handle()
@@ -35,4 +37,5 @@ async def acg_ai_handle(event: MessageEvent):
     if path_jpg == -1:
         await acg_r18.finish("failed")
     else:
-        await acg_r18.finish(MessageSegment.image(path_jpg))
+        _msg = MessageSegment("file", {"file": f"file://{path_jpg}"})
+        await acg_r18.finish(_msg)

@@ -1,9 +1,17 @@
 import asyncio
+import shutil
 import time
+import traceback
+from pathlib import Path
 
 import aiofiles
 import httpx
+from nonebot import require
 from nonebot.log import logger
+
+require("nonebot_plugin_localstore")
+import nonebot_plugin_localstore as store
+import os
 
 from . import config
 from .napcatqq_upload_stream import OneBotUploadTester
@@ -11,6 +19,7 @@ from .napcatqq_upload_stream import OneBotUploadTester
 # 协程限制
 semaphore_upload = asyncio.Semaphore(10)
 semaphore_download = asyncio.Semaphore(20)
+fake_upload_path = os.path.join(str(store.get_plugin_cache_dir()), "fake_upload_path")
 
 class TokenBucket:
     def __init__(self, rate: float, capacity: float):
@@ -41,7 +50,17 @@ class TokenBucket:
 
 async def upload_file(path: str) -> str:
     if not config.is_enable_upload:
-        return path
+        # 执行文件复制
+        src = Path(path)
+        dst = Path(fake_upload_path)
+        if not src.is_file():
+            raise FileNotFoundError(src)
+        if not dst.is_dir() and dst.exists():
+            raise FileNotFoundError(dst)
+        dst.mkdir(parents=True, exist_ok=True)
+        dst_file = dst / src.name
+        shutil.copy2(src, dst_file)
+        return str(dst_file)
     async with semaphore_upload:
         upload = OneBotUploadTester()
         is_connected = False
@@ -93,4 +112,5 @@ async def download_file(url: str, save_path: str, header: dict | None = None) ->
                         return 0
                 except Exception as e:
                     logger.warning(e)
+                    traceback.print_exc()
                     return -1

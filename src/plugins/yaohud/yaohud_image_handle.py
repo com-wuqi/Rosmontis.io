@@ -57,6 +57,7 @@ async def get_acg(img_type: str):
                     file_jpg.unlink()  # 删除文件
                     return _remote_path  # 返回远程地址
                 else:
+                    logger.warning("download failed")
                     return -1
 
             except HTTPStatusError as e:
