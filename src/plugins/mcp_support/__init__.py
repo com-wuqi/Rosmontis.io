@@ -16,10 +16,9 @@ config = _config.mcpsupport
 driver = get_driver()
 
 from .MultiMCPManager import MultiMCPManager
-from .mcp_config import mcp_configs
 
 if config.is_enable:
-    mcp_manger = MultiMCPManager(mcp_configs)
+    mcp_manger = MultiMCPManager()
 else:
     mcp_manger = None
 

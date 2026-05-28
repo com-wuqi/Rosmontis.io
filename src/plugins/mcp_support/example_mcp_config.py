@@ -1,6 +1,5 @@
-import os
 from dataclasses import dataclass
-from typing import Optional, Dict, Literal
+from typing import Literal
 
 
 @dataclass
@@ -11,50 +10,50 @@ class McpServerConfig:
     # 通信方案
 
     # stdio config
-    command: Optional[str] = None  # 必须
-    args: Optional[list] = None
-    env: Optional[Dict[str, str]] = None
+    command: str | None = None  # 必须
+    args: list | None = None
+    env: dict[str, str] | None = None
 
     # SSE / Streamable HTTP config
-    url: Optional[str] = None  # 必须
+    url: str | None = None  # 必须
 
     # 通用配置
     timeout: int = 60  # 可选, client 超时控制
-    prefix: Optional[str] = None
+    prefix: str | None = None
     # 私有前缀, 用于区分同名工具
-    headers: Optional[Dict[str, str]] = None  # 认证头等
+    headers: dict[str, str] | None = None  # 认证头等
 
 
 # 以下是配置项
 # 工作目录可以自定义, 但是注意需要自行创建
 mcp_init_timeout = 180  # 初始化时间限制 (加载工具列表前)
 mcp_configs = [
-    McpServerConfig(
-        name="filesystem",
-        transport="stdio",
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-filesystem", f"{os.path.abspath("mcp_workdir/fs")}"],
-        prefix="fs",
-    ),
-    McpServerConfig(
-        name="server-memory",
-        transport="stdio",
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-memory"],
-        env={
-            "MEMORY_FILE_PATH": f"{os.path.abspath("mcp_workdir/memory/memory.json")}"
-        },
-        prefix="memory"
-    ),
+    # McpServerConfig(
+    #     name="filesystem",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-filesystem", f"{os.path.abspath("mcp_workdir/fs")}"],
+    #     prefix="fs",
+    # ),
+    # McpServerConfig(
+    #     name="server-memory",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-memory"],
+    #     env={
+    #         "MEMORY_FILE_PATH": f"{os.path.abspath("mcp_workdir/memory/memory.json")}"
+    #     },
+    #     prefix="memory"
+    # ),
     McpServerConfig(
         name="rosmontis_mcp",
         transport="stdio",
-        command="python",
+        command="python3",
         args=["./src/plugins/mcp_support/buildin_mcp.py"],
         env={
             "IS_ENABLE_GET_CURRENT_TIME": "true",  # false
-            "IS_ENABLE_CALL_WEB_SEARCH": "true",
-            "IS_ENABLE_RUN_CODE_IN_E2B": "true",
+            "IS_ENABLE_CALL_WEB_SEARCH": "false",
+            "IS_ENABLE_RUN_CODE_IN_E2B": "false",
             # 时间, 网络搜索, e2b代码沙箱的开关
             "WEBSEARCH_BASE_URL": "https://api.bocha.cn/v1/web-search",
             # 网页搜索 api ,不支持修改, https://open.bochaai.com/ 注册

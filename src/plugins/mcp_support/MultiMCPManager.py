@@ -10,11 +10,15 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.types import LoggingMessageNotificationParams
 from nonebot.log import logger
 
-from .mcp_config import McpServerConfig, mcp_init_timeout
+try:
+    from .mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
+except ModuleNotFoundError:
+    logger.warning("导入mcp_config失败，降级使用example.mcp_config")
+    from .example_mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
 
 
 class MultiMCPManager:
-    def __init__(self, configs: list[McpServerConfig]):
+    def __init__(self, configs: list[McpServerConfig] = mcp_configs):
         self.configs = configs  # 配置
         self.sessions: Dict[str, ClientSession] = {}  # 保存会话
         self.tool_map: Dict[str, str] = {}  # 修正名称: MCP服务名

@@ -2,6 +2,7 @@ from typing import List, Dict, Callable
 
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot
+from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.plugin import PluginMetadata
 
@@ -25,6 +26,20 @@ message_matcher: Dict[Callable, Callable] = {
 message_matcher_switch: List[bool] = [
     config.is_enable_image
 ]
+
+
+async def get_file_from_event(event: MessageEvent, bot: Bot) -> tuple[int, str]:
+    _msg = ""
+    _counter = 0
+    for segment in event.message:
+        logger.debug("segment.data : {}".format(segment.data))
+        try:
+            _read_file = await ai_file_reader(segment, bot)
+            _msg = _msg + "\n" + _read_file
+            _counter += 1
+        except Exception as e:
+            logger.warning(f"读取失败: {e}")
+    return _counter, _msg
 
 
 async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
@@ -59,7 +74,12 @@ async def ai_file_reader(segment: MessageSegment, bot: Bot) -> str:
                 file_info = await bot.call_api("get_private_file_url", file_id=file_id)
                 file_url = file_info["url"]
             _result_msg = await value(file_name, file_url)
-            result_msg = _result_msg if _result_msg else result_msg
+            # logger.debug(f"_result_msg: {_result_msg}")
+            # logger.debug(f"_result_msg type: {type(_result_msg)}")
+            if _result_msg is None:
+                logger.warning(f"_result_msg is None with file {file_name}")
+            else:
+                result_msg = _result_msg
             break
 
     return result_msg

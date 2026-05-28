@@ -479,7 +479,7 @@ pyjwt[crypto]==2.12.1
     # via
     #   -r requirements.txt
     #   mcp
-pymdown-extensions==10.21.2
+pymdown-extensions==10.21.3
     # via
     #   -r requirements.txt
     #   nonebot-plugin-htmlrender

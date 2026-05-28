@@ -5,6 +5,7 @@ import mimetypes
 import os
 import re
 import time
+import traceback
 
 from PIL import Image
 from nonebot import require
@@ -17,9 +18,9 @@ require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
-from src.plugins.public_apis import TokenBucket, download_file
+import src.plugins.public_apis as public_api
 
-_token_bucket = TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
+_token_bucket = public_api.TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
 
 def is_supported_image(s: str) -> bool:
     """
@@ -96,14 +97,14 @@ def encode_image(image_path):
 async def encode_image_async(image_path):
     loop = asyncio.get_event_loop()
     func = functools.partial(encode_image, image_path)
-    result = await loop.run_in_executor(None, func)
+    result = await loop.run_in_executor(public_api.global_progress_pool, func)
     return result
 
 
 async def compress_image_async(input_path, output_path, **kwargs):
     loop = asyncio.get_running_loop()
     func = functools.partial(compress_image, input_path, output_path, **kwargs)
-    result = await loop.run_in_executor(None, func)
+    result = await loop.run_in_executor(public_api.global_progress_pool, func)
     return result
 
 
@@ -117,7 +118,7 @@ async def read_image(file_name: str, file_url: str) -> str | None:
         if mime_type is None:
             raise RuntimeError("guess type error")
         # 图片下载，压缩
-        _try_download = await download_file(file_url, str(image_path))
+        _try_download = await public_api.download_file(file_url, str(image_path))
         if _try_download != 0:
             raise RuntimeError("download failed")
         await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))
@@ -133,6 +134,8 @@ async def read_image(file_name: str, file_url: str) -> str | None:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": "请准确，详细，客观的描述图片里的所有内容"},
+                        {"type": "text", "text": "要求：直接输出最终描述结果，不要输出任何思考过程或解释。"},
+                        {"type": "text", "text": "输出格式：纯文本，无需分段标题。"},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -144,16 +147,23 @@ async def read_image(file_name: str, file_url: str) -> str | None:
 
                 }
             ],
-            temperature=1.0
+            temperature=1.0,
         )
         _return = chat_completion.choices[0].message
-        # logger.debug(f"read_image: {_return.content}")
-        return _return.content
+        if not _return or not _return.content:
+            logger.warning(
+                f"返回空内容，"
+                f"finish_reason: {getattr(chat_completion.choices[0], 'finish_reason', 'unknown')} | "
+                f"完整响应: {chat_completion.model_dump()}")
+            raise RuntimeError("模型未返回有效描述内容")
+        _msg = _return.content
+        logger.debug(f"read_image: {_msg}")
+        return _msg
 
     except Exception as e:
         logger.error(e)
+        traceback.print_exc()
     finally:
         image_path.unlink(missing_ok=True)
         compressed_image_path.unlink(missing_ok=True)
-
     return None

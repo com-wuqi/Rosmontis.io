@@ -149,3 +149,5 @@ cookies-*.json
 data.db
 testplugins/
 *test*.db
+*user*.md
+

@@ -5,9 +5,10 @@ from typing import List, Dict
 
 import aiofiles
 from nonebot.log import logger
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError, APIConnectionError, AuthenticationError, APITimeoutError, APIStatusError
 from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryCallState
 
 from . import config
 from .models import *
@@ -46,6 +47,41 @@ hooked_tools = hooked_mcp_tools.hooked_tools
 semaphore = asyncio.Semaphore(50)  # 网络限制最大并发数为50
 semaphore_sql = asyncio.Semaphore(50) # 数据库最大并发50
 
+
+def _on_before(retry_state: RetryCallState):
+    attempt = retry_state.attempt_number
+    elapsed = retry_state.seconds_since_start
+    if attempt > 1:
+        logger.debug(
+            f"send_messages_to_ai | "
+            f"准备进行第 {attempt} 次尝试 | "
+            f"距离首次调用 {elapsed:.2f} s"
+        )
+        # 这里可以引入 circuit breaker，从外部获取是否允许重试
+    else:
+        logger.debug(
+            f"send_messages_to_ai | "
+            "first call, no retry"
+        )
+
+
+def _on_after(retry_state: RetryCallState):
+    """调用结束后记录"""
+    exc = retry_state.outcome.exception()
+    retry_after = getattr(getattr(exc, "headers", None), "get", lambda k, d="N/A": d)("retry-after", "N/A")
+    will_retry = retry_state.next_action is not None and retry_state.next_action.sleep > 0
+
+    if will_retry:
+        logger.warning(
+            f"send_messages_to_ai 重试 | attempt={retry_state.attempt_number} | "
+            f"wait={retry_state.next_action.sleep:.1f}s | "
+            f"error={type(exc).__name__} | retry_after={retry_after}"
+        )
+    else:
+        logger.error(
+            f"send_messages_to_ai 达到最大重试次数，调用失败 | attempts={retry_state.attempt_number} | {type(exc).__name__}: {exc}")
+
+
 async def get_model_names(key:str,url:str) -> List[str]:
     async with semaphore:
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=10)
@@ -60,17 +96,44 @@ async def get_model_names(key:str,url:str) -> List[str]:
             return []
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=30),  # 指数退避
+    retry=retry_if_exception_type((RateLimitError, APIConnectionError, APITimeoutError)),
+    before=_on_before,
+    after=_on_after,
+    reraise=True,  # 抛出原始异常
+)
 async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
     async with semaphore:
         tools = mcp_manger.all_tools if mcp_manger is not None else []
         client = AsyncOpenAI(base_url=url, api_key=key, timeout=config.api_timeout)
-        chat_completion = await client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            tools=tools + hooked_tools,
-            temperature=temperature
-        )
-        return chat_completion.choices[0].message
+        try:
+            chat_completion = await client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                tools=tools + hooked_tools,
+                temperature=temperature
+            )
+            usage = getattr(chat_completion, "usage", None) or {}
+            logger.info(
+                f"send_messages_to_ai 成功 | "
+                f"req_id={getattr(chat_completion, 'id', 'N/A')} | "
+                f"model={getattr(chat_completion, 'model', 'N/A')} | "
+                f"tokens: in={getattr(usage, 'prompt_tokens', '?')} | "
+                f"out={getattr(usage, 'completion_tokens', '?')} | "
+                f"total={getattr(usage, 'total_tokens', '?')}"
+            )
+            return chat_completion.choices[0].message
+        except AuthenticationError as e:
+            logger.warning("认证失败: {}".format(e))
+            raise
+        except APIStatusError as e:
+            logger.warning("业务异常: {}".format(e))
+            raise
+        except Exception as e:
+            logger.warning("未知异常: {}".format(e))
+            raise
 
 
 async def get_config_by_id(sid: int, session: AsyncSession):
