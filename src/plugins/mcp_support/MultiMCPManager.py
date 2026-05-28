@@ -12,7 +12,7 @@ from nonebot.log import logger
 
 try:
     from .mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
-except Exception as e:
+except ModuleNotFoundError:
     logger.warning("导入mcp_config失败，降级使用example.mcp_config")
     from .example_mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
 

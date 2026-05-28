@@ -18,9 +18,9 @@ require("nonebot_plugin_localstore")
 import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
-from src.plugins.public_apis import TokenBucket, download_file, global_progress_pool
+import src.plugins.public_apis as public_api
 
-_token_bucket = TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
+_token_bucket = public_api.TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
 
 def is_supported_image(s: str) -> bool:
     """
@@ -97,14 +97,14 @@ def encode_image(image_path):
 async def encode_image_async(image_path):
     loop = asyncio.get_event_loop()
     func = functools.partial(encode_image, image_path)
-    result = await loop.run_in_executor(global_progress_pool, func)
+    result = await loop.run_in_executor(public_api.global_progress_pool, func)
     return result
 
 
 async def compress_image_async(input_path, output_path, **kwargs):
     loop = asyncio.get_running_loop()
     func = functools.partial(compress_image, input_path, output_path, **kwargs)
-    result = await loop.run_in_executor(global_progress_pool, func)
+    result = await loop.run_in_executor(public_api.global_progress_pool, func)
     return result
 
 
@@ -118,7 +118,7 @@ async def read_image(file_name: str, file_url: str) -> str | None:
         if mime_type is None:
             raise RuntimeError("guess type error")
         # 图片下载，压缩
-        _try_download = await download_file(file_url, str(image_path))
+        _try_download = await public_api.download_file(file_url, str(image_path))
         if _try_download != 0:
             raise RuntimeError("download failed")
         await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))

@@ -35,7 +35,7 @@ ai相关: openai标准库实现, 支持自定义 MCP 服务 (支持sse, stdio, s
 
 MCP 调用需要 `nodejs` `npm` `npx`, 建议安装,
 
-复制文件 [src/plugins/mcp_support/example.mcp_config.py](src/plugins/mcp_support/example_mcp_config.py) 为
+复制文件 [src/plugins/mcp_support/example_mcp_config.py](src/plugins/mcp_support/example_mcp_config.py) 为
 `src/plugins/mcp_support/mcp_config.py`
 
 如果不使用, 进入文件 [mcp_config.py](src/plugins/mcp_support/mcp_config.py) 删除依赖 `nodejs` 的服务器
@@ -134,7 +134,7 @@ sudo docker logs -f rosbot # 检查是否连接成功
 
 ### 然后?
 
-到聊天窗口执行 `ai cf add` 按照向导添加 AI `api` 提供方
+到聊天窗口执行 `/ai cf add` 按照向导添加 AI `api` 提供方
 
 ## docker 使用构建产物 (缺少测试)
 

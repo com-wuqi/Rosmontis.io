@@ -26,14 +26,18 @@ if config.is_enable:
     @driver.on_bot_connect
     async def startup(bot: Bot):
         global message_handle_workers, message_handle_loop
-        message_handle_workers = MessageHandleWorkers(bot)
-        await message_handle_workers.init_workers()
-        message_handle_loop = asyncio.create_task(message_handle_workers.main_loop())
+        if message_handle_workers is None:
+            message_handle_workers = MessageHandleWorkers(bot)
+            await message_handle_workers.init_workers()
+        if message_handle_loop is None:
+            message_handle_loop = asyncio.create_task(message_handle_workers.main_loop())
 
 
 
     @driver.on_shutdown
     async def shutdown():
         global message_handle_workers, message_handle_loop
-        await message_handle_workers.close_workers()
-        message_handle_loop.cancel()
+        if message_handle_workers is not None:
+            await message_handle_workers.close_workers()
+        if message_handle_loop is not None:
+            message_handle_loop.cancel()

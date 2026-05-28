@@ -499,26 +499,30 @@ class MessageHandleWorkers:
             logger.debug(f"need to handle: {self.need_to_handle_queue.qsize()}")
 
     async def _single_worker(self):
-        try:
-            s_id, s_type = await self.need_to_handle_queue.get()
-            lock = await self.get_is_force_wait_lock(s_id)
+        while not self._stop_signal.is_set():
+            is_event_handled = False
             try:
-                await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
+                s_id, s_type = await self.need_to_handle_queue.get()
+                lock = await self.get_is_force_wait_lock(s_id)
+                try:
+                    await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
+                    is_event_handled = True
+                except Exception as e:
+                    logger.error("fail to handle message: {}".format(e))
+                    traceback.print_exc()
+                finally:
+                    async with lock:
+                        current = self._is_force_wait.get(s_id, 0)
+                        self._is_force_wait[s_id] = max(0, current - 1)
+            except asyncio.CancelledError:
+                # logger.debug("_single_worker cancelled")
+                pass
             except Exception as e:
                 logger.error("fail to handle message: {}".format(e))
                 traceback.print_exc()
             finally:
-                async with lock:
-                    current = self._is_force_wait.get(s_id, 0)
-                    self._is_force_wait[s_id] = max(0, current - 1)
-        except asyncio.CancelledError:
-            # logger.debug("_single_worker cancelled")
-            pass
-        except Exception as e:
-            logger.error("fail to handle message: {}".format(e))
-            traceback.print_exc()
-        finally:
-            self.need_to_handle_queue.task_done()
+                if is_event_handled:
+                    self.need_to_handle_queue.task_done()
 
     async def init_workers(self):
         self._workers.clear()
