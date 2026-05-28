@@ -521,8 +521,9 @@ class MessageHandleWorkers:
                 logger.error("fail to handle message: {}".format(e))
                 traceback.print_exc()
             finally:
-                if is_event_handled:
-                    self.need_to_handle_queue.task_done()
+                self.need_to_handle_queue.task_done()
+                if not is_event_handled:
+                    logger.warning("task not finished")
 
     async def init_workers(self):
         self._workers.clear()
