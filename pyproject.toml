@@ -3,7 +3,7 @@ name = "Rosmontis"
 version = "0.1.0"
 description = "Rosmontis"
 readme = "README.md"
-requires-python = ">=3.12, <4.0"
+requires-python = ">=3.14, <4.0"
 dependencies = [
     "nonebot2[aiohttp]>=2.4.4",
     "nonebot-adapter-onebot>=2.4.6",
@@ -42,7 +42,7 @@ nonebot-plugin-localstore = ["nonebot_plugin_localstore"]
 nonebot-plugin-orm = ["nonebot_plugin_orm"]
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -110,7 +110,7 @@ keep-runtime-typing = true
 
 [tool.pyright]
 # For Pylance/Pyright configurations, see https://microsoft.github.io/pyright/#/configuration.
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 pythonPlatform = "All"
 typeCheckingMode = "standard"
 
