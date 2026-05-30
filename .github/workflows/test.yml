@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'run_tests*.sh'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements-test.txt
+          fi
+
+      - name: Run tests
+        run: |
+          # 使用自定义脚本如果存在，否则直接运行pytest
+          if [ -f "run_tests.sh" ]; then
+            chmod +x run_tests.sh
+            ./run_tests.sh
+          else
+            python -m pytest tests/ -v --tb=short
+          fi

@@ -8,6 +8,9 @@ from nonebug import NONEBOT_INIT_KWARGS
 from pytest_asyncio import is_async_test
 
 os.environ["ENVIRONMENT"] = "test"
+# 禁用 Sentry 以减少测试延迟
+os.environ["SENTRY_DSN"] = ""
+os.environ["SENTRY_ENABLED"] = "false"
 
 
 def pytest_configure(config: pytest.Config):
