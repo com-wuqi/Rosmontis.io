@@ -1,3 +1,4 @@
+import builtins
 import os
 
 os.environ["SENTRY_DSN"] = ""
@@ -6,6 +7,15 @@ os.environ["SQLALCHEMY_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["ORM_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ[
     "APSCHEDULER_CONFIG"] = '{"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"sqlite:///:memory:","tablename":"apscheduler_jobs"}}}'
+builtins.input = lambda prompt="": "y"
+
+try:
+    import click
+
+    click.confirm = lambda *args, **kwargs: True
+    click.prompt = lambda *args, **kwargs: ""
+except ImportError:
+    pass
 
 import nonebot
 import pytest
