@@ -35,6 +35,8 @@ jobs:
           # 分离测试需要的最少依赖过于繁琐
 
       - name: Run tests
+        env:
+          DRIVER: "~aiohttp"
         run: |
           # 使用自定义脚本如果存在，否则直接运行pytest
           if [ -f "run_tests.sh" ]; then
