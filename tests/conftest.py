@@ -3,7 +3,7 @@ import os
 import nonebot
 import pytest
 # 导入适配器
-from nonebot.adapters.onebot.v11 import Adapter as ConsoleAdapter
+from nonebot.adapters.onebot.v11 import Adapter as onebot_v11_Adapter
 from nonebug import NONEBOT_INIT_KWARGS
 from pytest_asyncio import is_async_test
 
@@ -28,7 +28,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]):
 async def after_nonebot_init(after_nonebot_init: None):
     # 加载适配器
     driver = nonebot.get_driver()
-    driver.register_adapter(ConsoleAdapter)
+    driver.register_adapter(onebot_v11_Adapter)
 
     # 加载插件
     nonebot.load_from_toml("pyproject.toml")

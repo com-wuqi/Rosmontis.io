@@ -5,7 +5,7 @@ description = "Rosmontis"
 readme = "README.md"
 requires-python = ">=3.12, <4.0"
 dependencies = [
-    "nonebot2[aiohttp,fastapi]>=2.4.4",
+    "nonebot2[aiohttp]>=2.4.4",
     "nonebot-adapter-onebot>=2.4.6",
     "nonebot-plugin-sentry>=2.0.0",
     "nonebot-plugin-apscheduler>=0.5.0",
@@ -83,7 +83,7 @@ select = [
     "ARG",   # flake8-unused-arguments
     "PTH",   # flake8-use-pathlib
     # "ERA",   # eradicate
-    "FAST",  # FastAPI
+    # "FAST",  # FastAPI
     "PERF",  # Perflint
     "PGH",   # pygrep-hooks
     "FURB",  # refurb
