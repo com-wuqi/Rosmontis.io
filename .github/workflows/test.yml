@@ -43,5 +43,5 @@ jobs:
             chmod +x run_tests.sh
             ./run_tests.sh
           else
-            python -m pytest tests/ -v --tb=short
+            python -m pytest tests/ -v -s
           fi

@@ -270,10 +270,8 @@ pyright .
 
 ```bash
 # 运行单元测试
-pytest tests/
+python -m pytest tests/ -v -s
 
-# 覆盖率测试
-pytest --cov=src tests/
 ```
 
 ## 🔍 故障排除
