@@ -82,6 +82,10 @@ bcrypt==5.0.0
     # via
     #   -r requirements.txt
     #   chromadb
+beautifulsoup4==4.14.3
+    # via
+    #   markdownify
+    #   markitdown
 bracex==2.6
     # via
     #   -r requirements.txt
@@ -111,20 +115,28 @@ cffi==2.0.0
 charset-normalizer==3.4.7
     # via
     #   -r requirements.txt
+    #   markitdown
+    #   pdfminer-six
     #   requests
 chromadb==1.5.9
     # via -r requirements.txt
 click==8.3.3
     # via
     #   -r requirements.txt
+    #   magika
     #   nonebot-plugin-orm
     #   rich-toolkit
     #   typer
     #   uvicorn
+cobble==0.1.4
+    # via mammoth
 cryptography==48.0.0
     # via
     #   -r requirements.txt
+    #   pdfminer-six
     #   pyjwt
+defusedxml==0.7.1
+    # via markitdown
 deprecated==1.3.1
     # via -r requirements.txt
 distro==1.9.0
@@ -151,6 +163,8 @@ e2b-code-interpreter==2.6.2
     # via -r requirements.txt
 email-validator==2.3.0
     # via -r requirements.txt
+et-xmlfile==2.0.0
+    # via openpyxl
 exceptiongroup==1.3.1
     # via
     #   -r requirements.txt
@@ -284,10 +298,18 @@ loguru==0.7.3
     #   -r requirements.txt
     #   nonebot2
     #   sentry-sdk
+lxml==6.1.1
+    # via
+    #   markitdown
+    #   python-pptx
+magika==0.6.3
+    # via markitdown
 mako==1.3.12
     # via
     #   -r requirements.txt
     #   alembic
+mammoth==1.11.0
+    # via markitdown
 markdown==3.10.2
     # via
     #   -r requirements.txt
@@ -298,6 +320,10 @@ markdown-it-py==4.2.0
     # via
     #   -r requirements.txt
     #   rich
+markdownify==1.2.2
+    # via markitdown
+markitdown[docx,pdf,pptx,xls,xlsx]==0.1.6
+    # via -r requirements.txt
 markupsafe==3.0.3
     # via
     #   -r requirements.txt
@@ -374,7 +400,9 @@ numpy==2.4.4
     # via
     #   -r requirements.txt
     #   chromadb
+    #   magika
     #   onnxruntime
+    #   pandas
 oauthlib==3.3.1
     # via
     #   -r requirements.txt
@@ -383,8 +411,11 @@ onnxruntime==1.26.0
     # via
     #   -r requirements.txt
     #   chromadb
+    #   magika
 openai==2.36.0
     # via -r requirements.txt
+openpyxl==3.1.5
+    # via markitdown
 opentelemetry-api==1.41.1
     # via
     #   -r requirements.txt
@@ -430,8 +461,19 @@ packaging==26.2
     #   huggingface-hub
     #   onnxruntime
     #   pytest
+pandas==3.0.3
+    # via markitdown
+pdfminer-six==20251230
+    # via
+    #   markitdown
+    #   pdfplumber
+pdfplumber==0.11.9
+    # via markitdown
 pillow==12.2.0
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   pdfplumber
+    #   python-pptx
 playwright==1.59.0
     # via
     #   -r requirements.txt
@@ -514,6 +556,8 @@ pymysql==1.1.3
     # via
     #   -r requirements.txt
     #   aiomysql
+pypdfium2==5.8.0
+    # via pdfplumber
 pypika==0.51.1
     # via
     #   -r requirements.txt
@@ -536,9 +580,11 @@ python-dateutil==2.9.0.post0
     #   -r requirements.txt
     #   e2b
     #   kubernetes
+    #   pandas
 python-dotenv==1.2.2
     # via
     #   -r requirements.txt
+    #   magika
     #   nonebot2
     #   pydantic-settings
     #   uvicorn
@@ -550,6 +596,8 @@ python-multipart==0.0.28
     # via
     #   -r requirements.txt
     #   mcp
+python-pptx==1.0.2
+    # via markitdown
 pyyaml==6.0.3
     # via
     #   -r requirements.txt
@@ -568,6 +616,7 @@ requests==2.34.0
     #   -r requirements.txt
     #   async-asgi-testclient
     #   kubernetes
+    #   markitdown
     #   requests-oauthlib
 requests-oauthlib==2.0.0
     # via
@@ -603,11 +652,14 @@ six==1.17.0
     # via
     #   -r requirements.txt
     #   kubernetes
+    #   markdownify
     #   python-dateutil
 sniffio==1.3.1
     # via
     #   -r requirements.txt
     #   openai
+soupsieve==2.8.4
+    # via beautifulsoup4
 sqlalchemy==2.0.49
     # via
     #   -r requirements.txt
@@ -658,6 +710,7 @@ typing-extensions==4.15.0
     #   -r requirements.txt
     #   alembic
     #   arclet-alconna
+    #   beautifulsoup4
     #   chromadb
     #   e2b
     #   grpcio
@@ -677,6 +730,7 @@ typing-extensions==4.15.0
     #   pydantic-core
     #   pydantic-extra-types
     #   pyee
+    #   python-pptx
     #   rich-toolkit
     #   sqlalchemy
     #   tarina
@@ -727,6 +781,10 @@ wrapt==2.1.2
     # via
     #   -r requirements.txt
     #   deprecated
+xlrd==2.0.2
+    # via markitdown
+xlsxwriter==3.2.9
+    # via python-pptx
 yarl==1.23.0
     # via
     #   -r requirements.txt

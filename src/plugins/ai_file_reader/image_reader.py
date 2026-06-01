@@ -3,9 +3,9 @@ import base64
 import functools
 import mimetypes
 import os
-import re
 import time
 import traceback
+from pathlib import Path
 
 from PIL import Image
 from nonebot import require
@@ -22,14 +22,18 @@ import src.plugins.public_apis as public_api
 
 _token_bucket = public_api.TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
 
+_IMAGE_SUPPORTED_EXT = {
+    ".png", ".jpg", ".jpeg",
+    ".webp", ".gif"
+}
+
 def is_supported_image(s: str) -> bool:
     """
     判断文件后缀名是否是 openai 支持的图片
     :param s: 图片名称，包含后缀
     :return: bool, 是否匹配
     """
-    pattern = r"\.(png|jpe?g|webp|gif)(\?.*)?$"
-    return bool(re.search(pattern, s.strip(), re.IGNORECASE))
+    return Path(s).suffix.lower() in _IMAGE_SUPPORTED_EXT
 
 
 def compress_image(

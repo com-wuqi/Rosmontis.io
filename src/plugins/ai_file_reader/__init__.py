@@ -4,6 +4,7 @@ from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Bot
 from nonebot.adapters.onebot.v11 import MessageEvent
 from nonebot.adapters.onebot.v11 import MessageSegment
+from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
@@ -18,13 +19,16 @@ __plugin_meta__ = PluginMetadata(
 _config = get_plugin_config(Config)
 config = _config.ai_file_reader
 
-from .image_reader import *
+from . import image_reader as image_reader
+from . import markitdown_reader as md_reader
 
 message_matcher: Dict[Callable, Callable] = {
-    is_supported_image: read_image
+    image_reader.is_supported_image: image_reader.read_image,
+    md_reader.is_markitdown_supported_file: md_reader.read_markitdown_file
 }
 message_matcher_switch: List[bool] = [
-    config.is_enable_image
+    config.is_enable_image,
+    config.is_enable_markitdown
 ]
 
 
