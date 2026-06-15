@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from contextlib import AbstractAsyncContextManager
 from typing import Dict, Any
 
@@ -64,7 +65,7 @@ class MultiMCPManager:
 
         try:
             transport = await self._create_transport(cfg)
-            read, write = await transport.__aenter__()
+            read, write, *_ = await transport.__aenter__()
             transport_entered = True
 
             session = ClientSession(
@@ -89,6 +90,7 @@ class MultiMCPManager:
 
         except Exception as e:
             logger.warning(f"Server: {cfg.name} init failed: {e}")
+            traceback.print_exc()
             raise
 
         finally:

@@ -75,6 +75,15 @@ mcp_configs = [
         },
         prefix="ros",
     ),
+    # McpServerConfig(
+    #     name="luckin-coffee",
+    #     transport="streamable-http",
+    #     url="https://gwmcp.lkcoffee.com/order/user/mcp",
+    #     prefix="lkcoffee",
+    #     headers={
+    #         "Authorization": "Bearer <your token here>"
+    #     }
+    # )
 ]
 """
 其他例子
