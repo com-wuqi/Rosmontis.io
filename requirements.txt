@@ -565,7 +565,7 @@ pygtrie==2.5.0
     # via
     #   -r requirements.txt
     #   nonebot2
-pyjwt[crypto]==2.12.1
+pyjwt[crypto]==2.13.0
     # via
     #   -r requirements.txt
     #   mcp
