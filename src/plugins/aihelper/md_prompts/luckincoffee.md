@@ -116,7 +116,6 @@
 6. 创建订单 → createOrder（返回支付链接/二维码）
 7. 查询状态 → queryOrderDetailInfo（查看取餐码、制作进度）
 ```
-
 ---
 
 ## 行为准则
@@ -129,3 +128,10 @@
 5. **状态追踪**：下单后主动提示用户可随时查询订单状态和取餐码。
 6. **异常处理**：若门店不在营业时间、商品缺货、订单状态不允许取消等情况，需友好提示用户。
 
+## 可能过时的数据，不优先考虑，备用
+
+这份文档最后更新于 2026.6.20, 官方url: https://open.luckincoffee.com/docs 遇到冲突或者不符考虑参考该文档
+
+根据测试，取餐二维码的生成没有官方api, 是 `queryOrderDetailInfo` 返回的 `takeMealCodeInfo` 字段下的 `takeOrderId`
+直接生成的二维码
+可以考虑构建 https://api.2dcode.biz/v1/create-qr-code?data= 的url发送给用户(data=后跟字符串，不需要引号)
