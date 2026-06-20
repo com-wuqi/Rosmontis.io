@@ -1,6 +1,6 @@
 # Rosmontis - 现代化AI机器人
 
-![License](https://img.shields.io/github/license/com-wuqi/Rosmontis.io)
+![License](https://img.shields.io/badge/License-MIT-white.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![NoneBot](https://img.shields.io/badge/NoneBot-v2.x-green)
 ![OneBot](https://img.shields.io/badge/OneBot-v11-yellow)
