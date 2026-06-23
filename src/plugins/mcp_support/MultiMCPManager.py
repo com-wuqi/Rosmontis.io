@@ -31,30 +31,33 @@ class MultiMCPManager:
 
     async def connect_all(self):
         """ 初始化所有mcp连接 """
-        self._stop_event.clear()
-        self._ready_events.clear()
-
-        for cfg in self.configs:
-            self._ready_events[cfg.name] = asyncio.Event()  # 插入事件
-            task = asyncio.create_task(self._run_server(cfg))
-            self._tasks.append(task)
-
         try:
-            await asyncio.wait_for(
-                asyncio.gather(
-                    *[ev.wait() for ev in self._ready_events.values()]
-                ),
-                timeout=mcp_init_timeout
-            )
-            logger.info("All MCP servers ready")
-        except asyncio.TimeoutError:
-            not_ready = [name for name, ev in self._ready_events.items() if not ev.is_set()]
-            logger.warning(f"connect_all TimeoutError: MCP servers ready within : {not_ready}")
+            self._stop_event.clear()
+            self._ready_events.clear()
 
+            for cfg in self.configs:
+                self._ready_events[cfg.name] = asyncio.Event()  # 插入事件
+                task = asyncio.create_task(self._run_server(cfg))
+                self._tasks.append(task)
+
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(
+                        *[ev.wait() for ev in self._ready_events.values()]
+                    ),
+                    timeout=mcp_init_timeout
+                )
+                logger.info("All MCP servers ready")
+            except asyncio.TimeoutError:
+                not_ready = [name for name, ev in self._ready_events.items() if not ev.is_set()]
+                logger.warning(f"connect_all TimeoutError: MCP servers ready within : {not_ready}")
+
+            except Exception as e:
+                logger.warning(f"connect_all Failed: {e}")
+
+            await self.refresh_tools()
         except Exception as e:
-            logger.warning(f"connect_all Failed: {e}")
-
-        await self.refresh_tools()
+            logger.error(f"connect_all Failed {e}")
 
     async def _run_server(self, cfg: McpServerConfig):
 
@@ -200,9 +203,12 @@ class MultiMCPManager:
     async def close_all(self):
         """ 关闭所有连接 """
         self._stop_event.set()  # 触发关闭事件
-        for task in self._tasks:
-            task.cancel()
-        await asyncio.gather(*self._tasks, return_exceptions=True)
+        try:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+        except Exception as e:
+            logger.warning(f"close_all(self) Exception {e}")
+            for task in self._tasks:
+                task.cancel()
         self._tasks.clear()
         self._stop_event.clear()
         self.sessions.clear()

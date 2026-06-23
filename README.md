@@ -116,7 +116,8 @@ Rosmontis/
 
 6. **启动机器人**
    ```bash
-   nb run
+   # nb run # 由于未知的原因，这样启动会导致 ctrl+C 关闭时报错
+   python bot.py
    ```
 
 ### 方式二：Docker部署 (缺少测试)
