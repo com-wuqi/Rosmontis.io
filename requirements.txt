@@ -15,7 +15,7 @@ aiohappyeyeballs==2.6.1
     # via
     #   -r requirements.txt
     #   aiohttp
-aiohttp==3.14.0
+aiohttp==3.14.1
     # via -r requirements.txt
 aiomysql==0.3.2
     # via -r requirements.txt
@@ -133,7 +133,7 @@ cobble==0.1.4
     # via
     #   -r requirements.txt
     #   mammoth
-cryptography==48.0.0
+cryptography==48.0.1
     # via
     #   -r requirements.txt
     #   pdfminer-six
@@ -353,7 +353,7 @@ mmh3==5.2.1
     # via
     #   -r requirements.txt
     #   chromadb
-msgpack==1.1.2
+msgpack==1.2.1
     # via
     #   -r requirements.txt
     #   nonebot-adapter-onebot
@@ -546,7 +546,7 @@ pydantic-core==2.46.4
     #   pydantic
 pydantic-extra-types==2.11.1
     # via -r requirements.txt
-pydantic-settings==2.14.1
+pydantic-settings==2.14.2
     # via
     #   -r requirements.txt
     #   chromadb
@@ -565,7 +565,7 @@ pygtrie==2.5.0
     # via
     #   -r requirements.txt
     #   nonebot2
-pyjwt[crypto]==2.12.1
+pyjwt[crypto]==2.13.0
     # via
     #   -r requirements.txt
     #   mcp
@@ -615,7 +615,7 @@ python-markdown-math==0.9
     # via
     #   -r requirements.txt
     #   nonebot-plugin-htmlrender
-python-multipart==0.0.28
+python-multipart==0.0.31
     # via
     #   -r requirements.txt
     #   mcp
@@ -696,7 +696,7 @@ sse-starlette==3.4.4
     # via
     #   -r requirements.txt
     #   mcp
-starlette==1.0.1
+starlette==1.3.1
     # via
     #   -r requirements.txt
     #   mcp
