@@ -25,9 +25,12 @@ hooked_tools: list[dict[str, str | dict[str, str | dict[Any, Any] | bool]]] = [{
     "type": "function",
     "function": {
         "name": "hooked_mcp_test",
-        "description": f"测试 基于插件的mcp",
-        "parameters": {},
-        "additionalProperties": False
+        "description": "测试 基于插件的mcp",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
     }
 }]
 # [{
