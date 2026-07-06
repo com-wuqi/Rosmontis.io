@@ -57,6 +57,7 @@ mcp_configs = [
             # 时间, 网络搜索, e2b代码沙箱的开关
             "WEBSEARCH_BASE_URL": "https://api.bocha.cn/v1/web-search",
             # 网页搜索 api ,不支持修改, https://open.bochaai.com/ 注册
+            # firecrawl 也包含相关能力
             "WEBSEARCH_TIMEOUT": "90",
             # 单次搜索超时
             "WEBSEARCH_API_KEY": "sk-",
@@ -84,6 +85,35 @@ mcp_configs = [
     #         "Authorization": "Bearer <your token here>"
     #     }
     # )
+    # McpServerConfig(
+    #     name="Macdonald-mcp",
+    #     transport="streamable-http",
+    #     url="https://mcp.mcd.cn",
+    #     prefix="Macdonald",
+    #     headers={
+    #         "Authorization": "Bearer <your token here>"
+    #     }
+    # )
+    # McpServerConfig(
+    #     name="firecrawl",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "firecrawl-mcp"],
+    #     env={
+    #         "FIRECRAWL_API_KEY": "<your token here>"
+    #     },
+    #     prefix="firecrawl"
+    # ),
+    # McpServerConfig(
+    #     name="github-mcp",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-github"],
+    #     env={
+    #         "GITHUB_PERSONAL_ACCESS_TOKEN": "<your token here>"
+    #     },
+    #     prefix="github"
+    # ),
 ]
 """
 其他例子
