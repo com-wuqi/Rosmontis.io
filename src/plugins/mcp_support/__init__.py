@@ -1,3 +1,5 @@
+import asyncio
+
 from nonebot import get_driver, on_command
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent
@@ -33,7 +35,10 @@ async def _init_mcp_support():
 @driver.on_shutdown
 async def _shutdown_mcp_support():
     if mcp_manger is not None:
-        await mcp_manger.close_all()
+        try:
+            await mcp_manger.close_all()
+        except asyncio.CancelledError:
+            pass
 
 
 _superusers = get_driver().config.superusers

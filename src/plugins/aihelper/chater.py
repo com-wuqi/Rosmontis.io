@@ -547,7 +547,10 @@ class MessageHandleWorkers:
         self._stop_signal.set()
         for _worker in self._workers:
             _worker.cancel()
-        await asyncio.gather(*self._workers, return_exceptions=True)
+        try:
+            await asyncio.gather(*self._workers, return_exceptions=True)
+        except asyncio.CancelledError:
+            pass
         self._workers.clear()
 
     async def main_loop(self):

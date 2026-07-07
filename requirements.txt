@@ -375,7 +375,9 @@ nepattern==0.7.8
 nonebot-adapter-onebot==2.4.6
     # via -r requirements.txt
 nonebot-adapter-qq==1.7.1
-    # via nonebot-plugin-uninfo
+    # via
+    #   -r requirements.txt
+    #   nonebot-plugin-uninfo
 nonebot-plugin-alconna==0.62.0
     # via -r requirements.txt
 nonebot-plugin-apscheduler==0.5.0
@@ -639,6 +641,8 @@ pyyaml==6.0.3
     #   kubernetes
     #   pymdown-extensions
     #   uvicorn
+redis==8.0.1
+    # via -r requirements.txt
 referencing==0.37.0
     # via
     #   -r requirements.txt
@@ -837,4 +841,3 @@ zipp==4.1.0
     # via
     #   -r requirements.txt
     #   importlib-metadata
-redis==8.0.1

@@ -12,4 +12,9 @@ driver.register_adapter(ONEBOT_V11Adapter)
 nonebot.load_from_toml("pyproject.toml")
 
 if __name__ == "__main__":
-    nonebot.run()
+    try:
+        nonebot.run()
+    except KeyboardInterrupt:
+        pass
+    except BaseExceptionGroup:
+        pass

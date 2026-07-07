@@ -65,11 +65,14 @@ if config.is_enable:
     async def shutdown():
         global _redis, message_handle_workers, message_handle_loop
 
-        if message_handle_workers is not None:
-            await message_handle_workers.close_workers()
-        if message_handle_loop is not None:
-            message_handle_loop.cancel()
-        if _redis is not None:
-            await _redis.aclose()
-            _redis = None
-            logger.info("Redis connection closed")
+        try:
+            if message_handle_workers is not None:
+                await message_handle_workers.close_workers()
+            if message_handle_loop is not None:
+                message_handle_loop.cancel()
+            if _redis is not None:
+                await _redis.aclose()
+                _redis = None
+                logger.info("Redis connection closed")
+        except asyncio.CancelledError:
+            pass
