@@ -6,10 +6,11 @@ class ScopedConfig(BaseModel):
     is_enable: bool
     tools_max_once_calls: int = 45
     is_enable_tool_prompt: bool = True
-    api_timeout: int = 300  # api 超时限制
-    message_queue_timeout: int = 2  # 单个对话超时
-    message_queue_max_size: int = 5  # 单个会话最长缓存
-    max_workers: int = Field(default=10, ge=1)  # 最大worker数，过多会丢弃
+    api_timeout: int = 300
+    message_queue_timeout: int = 2
+    message_queue_max_size: int = 5
+    max_workers: int = Field(default=10, ge=1)
+    redis_url: str = "redis://localhost:6379/0"
 
 
 class Config(BaseModel):

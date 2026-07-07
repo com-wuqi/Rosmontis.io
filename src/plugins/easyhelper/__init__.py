@@ -67,7 +67,6 @@ async def request_help_handle(args: Message = CommandArg()):
     applemu [搜索名] [id | null] -- 下载音乐(apple音乐)
     """,
         "other": """
-    yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
     mcp-status -- MCP 服务状态

@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import socket
 import traceback
 
 from nonebot import get_driver, require
@@ -12,24 +14,20 @@ from ..ai_file_reader import get_file_from_event
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
-from . import config
+from . import get_redis
 # require("nonebot_plugin_apscheduler")
 from .aihelper_handles import *
 
 _Messages_dicts = {}
-# 这里应该是 {comments_id : Messages} 这里的id用于区分不同用户
-# 这个池子存储所有用户的所有对话信息
 _ai_switch = {}
-# 记录开关状态, 群id 或者 用户id 是index
 _config_settings = {}
-# 记录配置 用户id 是index, 类似 {id:{}}
-
 
 _locks: Dict[int, asyncio.Lock] = {}
-_locks_lock = asyncio.Lock()  # 元数据锁
+_locks_lock = asyncio.Lock()
 
-_message_queue: asyncio.Queue = asyncio.Queue(maxsize=60)
-# 待处理的信息队列
+_STREAM_IN = "ai:incoming"
+_STREAM_OUT = "ai:tasks"
+_GROUP = "aihelper"
 
 _superusers = get_driver().config.superusers
 _superusers = [int(k) for k in _superusers]
@@ -247,7 +245,9 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
         _counter, _msg = await get_file_from_event(event=event, bot=bot)
         if _counter != 0:
             # 信息是cq_code, 而且有文件读取成功或不支持
-            await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": True})
+            await get_redis().xadd(_STREAM_IN,
+                                   {"type": "file", "session_id": str(session_id), "session_type": session_type,
+                                    "file_extra": "1"})
             logger.debug(f"put \"extra\": True")
             is_a_block = True
             async with lock:
@@ -276,13 +276,17 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             if is_a_block:
                 # 含有文件
                 _raw_message[image_message_index] = {"role": "user", "content": f"{event.user_id}: {msg}"}
-                await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
-                await _message_queue.put({"type": "file", "session": (session_id, session_type), "extra": False})
+                await get_redis().xadd(_STREAM_IN,
+                                       {"type": "msg", "session_id": str(session_id), "session_type": session_type})
+                await get_redis().xadd(_STREAM_IN,
+                                       {"type": "file", "session_id": str(session_id), "session_type": session_type,
+                                        "file_extra": "0"})
                 logger.debug(f"put \"extra\": False")
             else:
                 # 常规对话:
                 _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
-                await _message_queue.put({"type": "msg", "session": (session_id, session_type)})
+                await get_redis().xadd(_STREAM_IN,
+                                       {"type": "msg", "session_id": str(session_id), "session_type": session_type})
     return
 
 @remove_memory_ai.handle()
@@ -449,14 +453,14 @@ async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bo
 
 class MessageHandleWorkers:
     def __init__(self, bot):
-        self._last_active_time: dict[int, float] = dict()  # id-上次信息的时间 asyncio.get_running_loop().time()
-        self._messages_counter: dict[int, int] = dict()  # id-当前信息数目
-        self._message_type: dict[int, str] = dict()  # id-会话类型
-        self._is_force_wait: dict[int, int] = dict()  # id-当前信息是否强制等待，不处理
+        self._last_active_time: dict[int, float] = dict()
+        self._messages_counter: dict[int, int] = dict()
+        self._message_type: dict[int, str] = dict()
+        self._is_force_wait: dict[int, int] = dict()
         self._is_force_wait_lock: dict[int, asyncio.Lock] = dict()
-        self._is_force_wait_lock_lock = asyncio.Lock()  # 元数据锁
-        self.need_to_handle_queue: asyncio.Queue = asyncio.Queue(maxsize=config.message_queue_max_size)
-        self.bot = bot  # bot 实例
+        self._is_force_wait_lock_lock = asyncio.Lock()
+        self._consumer_id = f"aggregator-{socket.gethostname()}-{os.getpid()}"
+        self.bot = bot
         self._workers: list[asyncio.Task] = []
         self._stop_signal: asyncio.Event = asyncio.Event()
 
@@ -468,7 +472,6 @@ class MessageHandleWorkers:
             return self._is_force_wait_lock[session_id]
 
     async def handle_merge(self):
-        _res = None
         for s_id, s_type in list(self._message_type.items()):
             if self._messages_counter.get(s_id) is None or self._last_active_time.get(s_id) is None:
                 continue
@@ -483,51 +486,62 @@ class MessageHandleWorkers:
                             if self._is_force_wait.get(s_id, 0) > 0:
                                 continue
                             self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) + 1
-                            self.need_to_handle_queue.put_nowait((s_id, s_type))
+                            await get_redis().xadd(_STREAM_OUT, {"session_id": str(s_id), "session_type": s_type})
                             self._messages_counter[s_id] = 0
                             self._last_active_time[s_id] = asyncio.get_running_loop().time()
-                    except asyncio.QueueFull as e:
-                        logger.warning("fail to handle message : {}".format(e))
-                        logger.warning("过多未处理的会话，自动丢弃最新的会话，被丢弃的会话会在下一个循环时被重新考虑")
-                    except asyncio.QueueShutDown as e:
-                        logger.warning("fail to handle message : {}".format(e))
                     except Exception as e:
-                        logger.warning("fail to handle message : {}".format(e))
+                        logger.warning(f"fail to handle message : {e}")
                         traceback.print_exc()
 
-        if not self.need_to_handle_queue.empty():
-            logger.debug(f"need to handle: {self.need_to_handle_queue.qsize()}")
-
-    async def _single_worker(self):
+    async def _single_worker(self, worker_index: int):
+        consumer_name = f"worker-{worker_index}-{socket.gethostname()}-{os.getpid()}"
         while not self._stop_signal.is_set():
             is_event_handled = False
+            msg_id = None
             try:
-                s_id, s_type = await self.need_to_handle_queue.get()
+                result = await get_redis().xreadgroup(
+                    groupname=_GROUP,
+                    consumername=consumer_name,
+                    streams={_STREAM_OUT: ">"},
+                    count=1,
+                    block=1000,
+                )
+                if not result:
+                    continue
+
+                messages = result[0][1]
+                if not messages:
+                    continue
+
+                msg_id, fields = messages[0]
+                s_id = int(fields["session_id"])
+                s_type = fields["session_type"]
                 lock = await self.get_is_force_wait_lock(s_id)
                 try:
                     await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
                     is_event_handled = True
                 except Exception as e:
-                    logger.error("fail to handle message: {}".format(e))
+                    logger.error(f"fail to handle message: {e}")
                     traceback.print_exc()
                 finally:
                     async with lock:
                         current = self._is_force_wait.get(s_id, 0)
                         self._is_force_wait[s_id] = max(0, current - 1)
             except asyncio.CancelledError:
-                # logger.debug("_single_worker cancelled")
                 pass
             except Exception as e:
-                logger.error("fail to handle message: {}".format(e))
+                logger.error(f"fail to handle message: {e}")
                 traceback.print_exc()
             finally:
-                self.need_to_handle_queue.task_done()
-                if not is_event_handled:
-                    logger.warning("task not finished")
+                if msg_id is not None:
+                    try:
+                        await get_redis().xack(_STREAM_OUT, _GROUP, msg_id)
+                    except Exception as e:
+                        logger.error(f"fail to ack message {msg_id}: {e}")
 
     async def init_workers(self):
         self._workers.clear()
-        self._workers = [asyncio.create_task(self._single_worker()) for _ in range(config.max_workers)]
+        self._workers = [asyncio.create_task(self._single_worker(i)) for i in range(config.max_workers)]
 
     async def close_workers(self):
         self._stop_signal.set()
@@ -540,29 +554,46 @@ class MessageHandleWorkers:
         while True:
             if self._stop_signal.is_set():
                 return
-            data_list = []
-            while not _message_queue.empty():
-                try:
-                    _data = _message_queue.get_nowait()
-                    data_list.append(_data)
-                    _message_queue.task_done()
-                except asyncio.QueueEmpty:
-                    break
+            try:
+                result = await get_redis().xreadgroup(
+                    groupname=_GROUP,
+                    consumername=self._consumer_id,
+                    streams={_STREAM_IN: ">"},  # 只读新信息
+                    count=20,
+                    block=500,
+                )
+            except Exception as e:
+                logger.error(f"fail to read from Redis Stream: {e}")
+                await asyncio.sleep(0.5)
+                continue
 
-            if len(data_list) == 0:
+            data_list: list[dict] = []
+            if result:
+                messages = result[0][1]
+                for msg_id, fields in messages:
+                    entry = {
+                        "type": fields["type"],
+                        "session_id": fields["session_id"],
+                        "session_type": fields["session_type"],
+                        "msg_id": msg_id,
+                    }
+                    if fields["type"] == "file":
+                        entry["file_extra"] = fields.get("file_extra", "0") == "1"
+                    data_list.append(entry)
+
+            if not data_list:
                 try:
                     await self.handle_merge()
                 except Exception as e:
-                    logger.error("fail to handle message: {}".format(e))
-
+                    logger.error(f"fail to handle message: {e}")
                     traceback.print_exc()
                 await asyncio.sleep(1 / 2)
                 continue
 
             try:
                 for data in data_list:
-                    logger.debug("_message_queue.get() : {}".format(data))
-                    _s_id, _s_type = data["session"]
+                    _s_id = int(data["session_id"])
+                    _s_type = data["session_type"]
                     self._message_type[_s_id] = _s_type
                     self._last_active_time[_s_id] = asyncio.get_running_loop().time()
                     if data["type"] == "msg":
@@ -570,7 +601,7 @@ class MessageHandleWorkers:
                     elif data["type"] == "file":
                         lock = await self.get_is_force_wait_lock(_s_id)
                         async with lock:
-                            if data["extra"]:
+                            if data.get("file_extra", False):
                                 self._is_force_wait[_s_id] = self._is_force_wait.get(_s_id, 0) + 1  # 当前有文件
                             else:
                                 current = self._is_force_wait.get(_s_id, 0)
@@ -578,6 +609,12 @@ class MessageHandleWorkers:
                     else:
                         logger.warning(f"unknown message type: {data['type']}")
                 await self.handle_merge()
+
+                for data in data_list:
+                    try:
+                        await get_redis().xack(_STREAM_IN, _GROUP, data["msg_id"])  # 通知成功处理
+                    except Exception as e:
+                        logger.error(f"fail to ack message {data['msg_id']}: {e}")
             except Exception as e:
-                logger.error("fail to handle message : {}".format(e))
+                logger.error(f"fail to handle message : {e}")
                 traceback.print_exc()

@@ -837,3 +837,4 @@ zipp==4.1.0
     # via
     #   -r requirements.txt
     #   importlib-metadata
+redis==8.0.1
