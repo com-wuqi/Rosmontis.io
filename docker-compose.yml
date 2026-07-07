@@ -62,7 +62,7 @@ services:
 
   # Redis
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: rosbot-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --save 900 1 --save 300 10

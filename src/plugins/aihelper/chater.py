@@ -14,20 +14,20 @@ from ..ai_file_reader import get_file_from_event
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
-from . import get_redis
+from . import get_redis, _STREAM_INCOMING, _STREAM_TASKS, _GROUP
 # require("nonebot_plugin_apscheduler")
 from .aihelper_handles import *
 
-_Messages_dicts = {}
-_ai_switch = {}
-_config_settings = {}
+from .session import (
+    _Messages_dicts, _ai_switch, _config_settings,
+    _session_save, _session_delete, _ensure_session_loaded,
+)
 
 _locks: Dict[int, asyncio.Lock] = {}
 _locks_lock = asyncio.Lock()
 
-_STREAM_IN = "ai:incoming"
-_STREAM_OUT = "ai:tasks"
-_GROUP = "aihelper"
+_STREAM_IN = _STREAM_INCOMING  # 信息进入
+_STREAM_OUT = _STREAM_TASKS  # task
 
 _superusers = get_driver().config.superusers
 _superusers = [int(k) for k in _superusers]
@@ -187,8 +187,8 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
             _raw_message: list = _Messages_dicts[session_id]
             _raw_message.append({"role": "system", "content": f"{_config_settings[session_id].system}"})
             _raw_message.extend(_tool_prompts)
+        await _session_save(session_id, _Messages_dicts[session_id], active=True)
 
-    # logger.debug(f"id : {session_id} | _raw_message : {_Messages_dicts[session_id]}")
     await start_ai.finish("收到~")
 
 @stop_ai.handle()
@@ -197,12 +197,11 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
     lock = await get_session_lock(session_id)
     async with lock:
         _ai_switch[session_id] = False
-        # 这里不回收加载的配置文件
         raw = await get_comments_by_id(sid=session_id,session=session)
         try:
             _ = _Messages_dicts[session_id]
         except KeyError:
-            # 这不是异常，为空时也可能被调用
+            await _session_save(session_id, [], active=False)
             await stop_ai.finish("拜拜~")
         if len(_Messages_dicts[session_id])>=0:
             #
@@ -212,10 +211,10 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
                 if res == -1:
                     logger.error("fail to update comments : 信息更新失败")
             else:
-                # 不存在记录
                 _ = await save_comments_by_id(sid=session_id,session=session,msg=json.dumps(_Messages_dicts[session_id]))
         else:
             pass
+        await _session_save(session_id, _Messages_dicts[session_id], active=False)
 
     await stop_ai.finish("拜拜~")
 
@@ -228,6 +227,7 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     # _raw_message.append 实现
 
     session_id,session_type = get_comments_id(event)
+    await _ensure_session_loaded(session_id)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复
     msg = str(event.get_message()).strip()
@@ -251,8 +251,9 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             logger.debug(f"put \"extra\": True")
             is_a_block = True
             async with lock:
-                image_message_index = len(_raw_message)  # 当前信息的下一个位置
-                _raw_message.append({"role": "user", "content": f"{event.user_id}: image is processing"})  # 留空，占位
+                image_message_index = len(_raw_message)
+                _raw_message.append({"role": "user", "content": f"{event.user_id}: image is processing"})
+                await _session_save(session_id, _raw_message, active=True)
             logger.debug("is_valid_cq_code matched, is it a file ?")
             msg = _msg
         else:
@@ -266,9 +267,11 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             # 判断: 是system提示词+(私聊/群聊(管理员/所有者))
             if session_type == "PrivateMessageEvent":
                 _raw_message.append({"role": "system", "content": f"{msg}"})
+                await _session_save(session_id, _raw_message, active=True)
                 await ai_chat.finish("system hook by user: {}".format(event.user_id))
             elif event.sender.role == "admin" or event.sender.role == "owner":
                 _raw_message.append({"role": "system", "content": f"{msg}"})
+                await _session_save(session_id, _raw_message, active=True)
                 await ai_chat.finish("system hook by user: {}".format(event.user_id))
             else:
                 await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
@@ -287,6 +290,7 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
                 _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
                 await get_redis().xadd(_STREAM_IN,
                                        {"type": "msg", "session_id": str(session_id), "session_type": session_type})
+        await _session_save(session_id, _raw_message, active=True)
     return
 
 @remove_memory_ai.handle()
@@ -301,10 +305,12 @@ async def remove_memory_ai_handle(event: MessageEvent):
         if session_type == "GroupMessageEvent":
             if event.sender.role == "admin" or event.sender.role == "owner":
                 _Messages_dicts[session_id] = []
+                await _session_delete(session_id)
             else:
                 await remove_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
         else:
             _Messages_dicts[session_id] = []
+            await _session_delete(session_id)
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
 
 @zip_memory_ai.handle()
@@ -327,6 +333,7 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
         # 执行
         _return_msg = await common_zip_message(row=row,_input_msg=_Messages_dicts[session_id])
         _Messages_dicts[session_id] = _return_msg
+        await _session_save(session_id, _return_msg, active=True)
 
         await zip_memory_ai.finish("压缩已完成: 一定要运行 ai save 否则不会被保存到数据库")
 
@@ -367,9 +374,10 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
 
 async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bot) -> None:
     logger.debug("single_user_event_handle")
+    await _ensure_session_loaded(_session_id)
     lock = await get_session_lock(_session_id)
     _event_setting = _config_settings[_session_id]
-    # 指定配置文件
+    # 配置文件， _ensure_session_loaded确保其存在
     _raw_message: list = _Messages_dicts[_session_id]
     _res = None
     async with lock:  #
@@ -432,6 +440,7 @@ async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bo
         except Exception as e:
             logger.error("failed : {}".format(e))
             traceback.print_exc()
+        await _session_save(_session_id, _raw_message, active=True)
 
     # 不再持有锁
     if _res is None:
@@ -476,7 +485,9 @@ class MessageHandleWorkers:
             if self._messages_counter.get(s_id) is None or self._last_active_time.get(s_id) is None:
                 continue
             number_of_msg = self._messages_counter.get(s_id, 0)
+            # 信息条数
             delt_time = asyncio.get_running_loop().time() - self._last_active_time[s_id]
+            # 时间间隔
             if number_of_msg > 0:
                 if delt_time >= config.message_queue_timeout or number_of_msg >= config.message_queue_max_size:
                     try:

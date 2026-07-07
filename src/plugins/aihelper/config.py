@@ -11,6 +11,7 @@ class ScopedConfig(BaseModel):
     message_queue_max_size: int = 5
     max_workers: int = Field(default=10, ge=1)
     redis_url: str = "redis://localhost:6379/0"
+    redis_long_expire_time: int = 7 * 24 * 3600  # 7 day
 
 
 class Config(BaseModel):

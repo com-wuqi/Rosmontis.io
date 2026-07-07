@@ -34,6 +34,7 @@
 ### 🔧 企业级特性
 
 - **Sentry监控**: 生产环境错误追踪
+- **Redis**: 消息队列（Stream）+ 会话持久化（Hash），支持故障自愈
 - **APScheduler**: 分布式任务调度
 - **数据库支持**: MySQL + SQLite双引擎
 - **Docker部署**: 完整的容器化方案
@@ -79,6 +80,7 @@ Rosmontis/
    - Python 3.12+
    - Node.js 18+ (用于MCP支持)
    - MySQL 8.0+ 或 SQLite
+   - Redis 8+ (用于消息队列与会话持久化)
    - Napcat 实例 (请参考`https://napneko.github.io/`)
 
 2. **创建虚拟环境**
@@ -174,6 +176,10 @@ Rosmontis/
 ```env
 # AI助手总开关
 AIHELPER__IS_ENABLE=true
+
+# Redis连接（消息队列+会话持久化）
+AIHELPER__REDIS_URL=redis://localhost:6379/0
+AIHELPER__REDIS_LONG_EXPIRE_TIME=604800
 
 # 文件读取能力
 AI_FILE_READER__IS_ENABLE=true

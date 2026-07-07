@@ -23,6 +23,8 @@ message_handle_loop = None
 _STREAM_INCOMING = "ai:incoming"
 _STREAM_TASKS = "ai:tasks"
 _GROUP = "aihelper"
+_SESSION_PREFIX = "ai:session:"
+_SESSION_TTL = config.redis_long_expire_time
 
 
 def get_redis() -> aioredis.Redis:
