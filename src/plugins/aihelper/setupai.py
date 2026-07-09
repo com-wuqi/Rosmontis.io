@@ -8,8 +8,7 @@ require("nonebot_plugin_orm")
 from .aihelper_handles import *
 from nonebot_plugin_orm import async_scoped_session
 
-_superusers = get_driver().config.selfhostaiusers
-_superusers = [int(k) for k in _superusers]
+_superusers = set(get_driver().config.selfhostaiusers)
 # 这里提供通过对话修改数据库的方法
 
 setup_ai = on_command("ai cf add") # 增加配置文件
@@ -35,7 +34,7 @@ async def choose_config_handle(event: MessageEvent, session: async_scoped_sessio
     if not _config_id.isdigit():
         await choose_config.finish("config_id 需要是纯数字")
     # if int(_config_id) == 1
-    _res = await change_is_enable_by_id(config_id=int(_config_id), session=session, user_id=event.user_id)
+    _res = await change_is_enable_by_id(config_id=int(_config_id), session=session, user_id=str(event.user_id))
     if _res == -1:
         await choose_config.finish("fail")
     else:
@@ -48,7 +47,7 @@ async def choose_config_handle(event: MessageEvent, session: async_scoped_sessio
 async def show_config_handle(event: MessageEvent,session: async_scoped_session):
     if isinstance(event, GroupMessageEvent):
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
-    configs = await get_all_config_by_id(sid=event.user_id,session=session)
+    configs = await get_all_config_by_id(sid=str(event.user_id), session=session)
     _result = []
     if configs is not None:
         _result.append("user_id: {}".format(event.user_id))
@@ -81,7 +80,7 @@ async def switch_config_handle(event: MessageEvent, session: async_scoped_sessio
     if switch_list[0] == "1":
         await switch_config.finish("操作失败")
     _res = await switch_is_enable_by_id(config_id=int(switch_list[0]), session=session,
-                                        target=bool(int(switch_list[1])), user_id=event.user_id)
+                                        target=bool(int(switch_list[1])), user_id=str(event.user_id))
     if _res != 0:
         await switch_config.finish("404 not found")
     else:
@@ -98,7 +97,8 @@ async def delete_config_handle(event: MessageEvent, session: async_scoped_sessio
     if not config_id.strip() or not config_id.strip().isdigit():
         # isdigit() 判断纯数字
         await delete_config.finish("没有输入或者输入不合法: 要求提供配置id, 可以通过ai cf show获取")
-    _res = await del_config_by_config_id_and_uid(session=session, config_id=int(config_id.strip()), uid=event.user_id)
+    _res = await del_config_by_config_id_and_uid(session=session, config_id=int(config_id.strip()),
+                                                 uid=str(event.user_id))
     if _res == 0:
         await delete_config.finish("操作成功")
     else:
@@ -111,7 +111,7 @@ async def setup_ai_handle(event: MessageEvent,state: T_State):
         logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     await setup_ai.send(Message("setupai begin now : cancel取消"))
-    if event.user_id in _superusers:
+    if str(event.user_id) in _superusers:
         state["user_id"] = event.user_id
     else:
         await setup_ai.finish("user : {} try to run setup_ai but not SA".format(event.user_id))
@@ -218,7 +218,7 @@ async def setup_ai_confirm(state: T_State,session: async_scoped_session,event: M
     await setup_ai.send("url:{},\nkey:{},\nmodel_name:{},\nmax_length:{},\ntemperature:{}\nsystem_prompt:{}".format(state["url"],state["apikey"],state["model_name"],int(state["max_length"]),float(state["temperature"]),state["system_prompt"]))
     if confirm.strip() == "y":
         new_setting = Settings(url=state["url"], api_key=state["apikey"], model_name=state["model_name"],
-                               max_length=int(state["max_length"]), user_id=int(state["user_id"]),
+                               max_length=int(state["max_length"]), user_id=str(state["user_id"]),
                                system=state["system_prompt"], is_enabled=False)
         session.add(new_setting)
         await session.flush()

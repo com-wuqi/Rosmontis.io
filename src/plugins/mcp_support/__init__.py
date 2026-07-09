@@ -41,8 +41,7 @@ async def _shutdown_mcp_support():
             pass
 
 
-_superusers = get_driver().config.superusers
-_superusers = [int(k) for k in _superusers]
+_superusers = set(get_driver().config.superusers)
 mcp_status = on_command("mcp-status")
 mcp_reload = on_command("mcp-reload")  # 需要特权
 
@@ -56,7 +55,7 @@ async def mcp_status_handle():
 
 @mcp_reload.handle()
 async def mcp_reload_handle(event: MessageEvent):
-    if (event.user_id not in _superusers) or (not isinstance(event, PrivateMessageEvent)):
+    if (str(event.user_id) not in _superusers) or (not isinstance(event, PrivateMessageEvent)):
         await mcp_reload.finish("Permission denied")
         return
     if mcp_manger is None:

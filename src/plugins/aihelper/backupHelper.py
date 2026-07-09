@@ -23,12 +23,12 @@ async def backup_comments_handle(bot: Bot, event: MessageEvent, session: async_s
     # 备份的数据就是 json 字符串, 还原只需要原样放回去应该就行
     if isinstance(event, GroupMessageEvent):
         _session_type = "group"
-        _user_id = event.group_id
-        _res = await get_comments_by_id(sid=event.group_id, session=session)
+        _user_id = str(event.group_id)
+        _res = await get_comments_by_id(sid=str(event.group_id), session=session)
     else:
         _session_type = "user"
-        _user_id = event.user_id
-        _res = await get_comments_by_id(sid=event.user_id, session=session)
+        _user_id = str(event.user_id)
+        _res = await get_comments_by_id(sid=str(event.user_id), session=session)
 
     if _res is not None and _res.message:
 

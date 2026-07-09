@@ -136,7 +136,7 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,m
             raise
 
 
-async def get_config_by_id(sid: int, session: AsyncSession):
+async def get_config_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid, Settings.is_enabled == 1)
         result = await session.execute(smt)
@@ -155,7 +155,7 @@ async def get_config_by_id(sid: int, session: AsyncSession):
         return row
 
 
-async def get_all_config_by_id(sid: int, session: AsyncSession):
+async def get_all_config_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid)
         result = await session.execute(smt)
@@ -163,7 +163,7 @@ async def get_all_config_by_id(sid: int, session: AsyncSession):
         return row
 
 
-async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: AsyncSession):
+async def del_config_by_config_id_and_uid(config_id: int, uid: str, session: AsyncSession):
     async with semaphore_sql:
         # 保证只能操作自己的配置
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == uid)
@@ -177,8 +177,7 @@ async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: Asy
             return 0
 
 
-async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: bool, user_id: int) -> int:
-    # 修改 config_id 的 is_enable 为 bool(target)
+async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: bool, user_id: str) -> int:
     async with semaphore_sql:
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == user_id)
         result = await session.execute(smt)
@@ -191,8 +190,7 @@ async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: 
         return 0
 
 
-async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id: int) -> int | dict:
-    # 将 用户 user_id 的 配置文件 config_id 修改为 True , 其他为 false
+async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id: str) -> int | dict:
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == user_id)
         result = await session.execute(smt)
@@ -212,7 +210,7 @@ async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id:
         return {"_changed_to_true": _changed_to_true, "_changed_to_false": _changed_to_false}
 
 
-async def get_comments_by_id(sid: int, session: AsyncSession):
+async def get_comments_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
@@ -220,14 +218,14 @@ async def get_comments_by_id(sid: int, session: AsyncSession):
         return raw
 
 
-async def save_comments_by_id(sid: int, session: AsyncSession, msg: str):
+async def save_comments_by_id(sid: str, session: AsyncSession, msg: str):
     async with semaphore_sql:
         raw = AIHelperComments(comment_id=sid, message=msg)
         session.add(raw)
         await session.commit()
 
 
-async def update_comments_by_id(sid: int, session: AsyncSession, msg: str) -> int:
+async def update_comments_by_id(sid: str, session: AsyncSession, msg: str) -> int:
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
@@ -240,7 +238,7 @@ async def update_comments_by_id(sid: int, session: AsyncSession, msg: str) -> in
         return 0
 
 
-async def get_all_comment_ids(session: AsyncSession) -> List[int]:
+async def get_all_comment_ids(session: AsyncSession) -> List[str]:
     async with semaphore_sql:
         stmt = select(AIHelperComments.comment_id)
         result = await session.execute(stmt)
@@ -248,7 +246,7 @@ async def get_all_comment_ids(session: AsyncSession) -> List[int]:
         return id_list
 
 
-async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: int) -> str:
+async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: str) -> str:
     # 保存信息到文件, 完成上传
     temp_path = store.get_plugin_cache_file(f"{user_id}_{msg_type}_{time.time()}.txt.bak")
     try:

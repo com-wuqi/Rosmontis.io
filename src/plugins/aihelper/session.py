@@ -8,12 +8,12 @@ from nonebot_plugin_orm import get_session as get_orm_session
 
 from . import get_redis, _SESSION_TTL, _SESSION_PREFIX
 
-_Messages_dicts: dict[int, list] = {}
-_ai_switch: dict[int, bool] = {}
-_config_settings: dict[int, object] = {}
+_Messages_dicts: dict[str, list] = {}
+_ai_switch: dict[str, bool] = {}
+_config_settings: dict[str, object] = {}
 
 
-async def _session_load(sid: int) -> tuple[list, bool]:
+async def _session_load(sid: str) -> tuple[list, bool]:
     data = await get_redis().hgetall(f"{_SESSION_PREFIX}{sid}")
     if not data:
         return [], False
@@ -22,7 +22,7 @@ async def _session_load(sid: int) -> tuple[list, bool]:
     return messages, active
 
 
-async def _session_save(sid: int, messages: list, active: bool) -> None:
+async def _session_save(sid: str, messages: list, active: bool) -> None:
     key = f"{_SESSION_PREFIX}{sid}"
     await get_redis().hset(key, mapping={
         "messages": json.dumps(messages, ensure_ascii=False),
@@ -34,11 +34,11 @@ async def _session_save(sid: int, messages: list, active: bool) -> None:
         await get_redis().expire(key, int(_SESSION_TTL / 2))
 
 
-async def _session_delete(sid: int) -> None:
+async def _session_delete(sid: str) -> None:
     await get_redis().delete(f"{_SESSION_PREFIX}{sid}")
 
 
-async def _ensure_session_loaded(sid: int) -> None:
+async def _ensure_session_loaded(sid: str) -> None:
     # 这里确保正确加载（包括从redis里面恢复）
     if sid in _Messages_dicts:
         return

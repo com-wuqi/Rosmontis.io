@@ -150,5 +150,4 @@ data.db
 testplugins/
 *test*.db
 *user*.md
-docs/architecture-notes.md
-
+docs/design*.md

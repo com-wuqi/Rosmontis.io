@@ -23,14 +23,13 @@ from .session import (
     _session_save, _session_delete, _ensure_session_loaded,
 )
 
-_locks: Dict[int, asyncio.Lock] = {}
+_locks: Dict[str, asyncio.Lock] = {}
 _locks_lock = asyncio.Lock()
 
 _STREAM_IN = _STREAM_INCOMING  # 信息进入
 _STREAM_OUT = _STREAM_TASKS  # task
 
-_superusers = get_driver().config.superusers
-_superusers = [int(k) for k in _superusers]
+_superusers = set(get_driver().config.superusers)
 
 start_ai = on_command("ai load",priority=4,block=True)
 stop_ai = on_command("ai save",priority=4,block=True)
@@ -52,21 +51,21 @@ def is_valid_cq_code(s: str) -> bool:
     return bool(re.fullmatch(pattern, s.strip()))
 
 
-async def get_session_lock(session_id: int) -> asyncio.Lock:
-    """获取或创建指定会话的锁"""
+async def get_session_lock(session_id: str) -> asyncio.Lock:
     async with _locks_lock:
         if session_id not in _locks:
             _locks[session_id] = asyncio.Lock()
         return _locks[session_id]
 
-def get_comments_id(event:MessageEvent):
-    if isinstance(event,GroupMessageEvent):
-        return event.group_id,"GroupMessageEvent"
-    elif isinstance(event,PrivateMessageEvent):
-        return event.user_id,"PrivateMessageEvent"
+
+def get_comments_id(event: MessageEvent):
+    if isinstance(event, GroupMessageEvent):
+        return str(event.group_id), "group"
+    elif isinstance(event, PrivateMessageEvent):
+        return str(event.user_id), "private"
     else:
         logger.error("fail to get comments type : 信息类型获取失败")
-        return event.user_id,"unknown"
+        return str(event.user_id), "unknown"
 
 def generate_zip_message(raw_message:list):
     dialog_lines = []
@@ -244,9 +243,8 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     if is_valid_cq_code(msg):
         _counter, _msg = await get_file_from_event(event=event, bot=bot)
         if _counter != 0:
-            # 信息是cq_code, 而且有文件读取成功或不支持
             await get_redis().xadd(_STREAM_IN,
-                                   {"type": "file", "session_id": str(session_id), "session_type": session_type,
+                                   {"type": "file", "session_id": session_id, "session_type": session_type,
                                     "file_extra": "1"})
             logger.debug(f"put \"extra\": True")
             is_a_block = True
@@ -264,8 +262,7 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
         _raw_message: list = _Messages_dicts[session_id]
         first_word = msg.split()[0] if msg.split() else ""
         if first_word == "system" and not is_a_block:
-            # 判断: 是system提示词+(私聊/群聊(管理员/所有者))
-            if session_type == "PrivateMessageEvent":
+            if session_type == "private":
                 _raw_message.append({"role": "system", "content": f"{msg}"})
                 await _session_save(session_id, _raw_message, active=True)
                 await ai_chat.finish("system hook by user: {}".format(event.user_id))
@@ -280,16 +277,16 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
                 # 含有文件
                 _raw_message[image_message_index] = {"role": "user", "content": f"{event.user_id}: {msg}"}
                 await get_redis().xadd(_STREAM_IN,
-                                       {"type": "msg", "session_id": str(session_id), "session_type": session_type})
+                                       {"type": "msg", "session_id": session_id, "session_type": session_type})
                 await get_redis().xadd(_STREAM_IN,
-                                       {"type": "file", "session_id": str(session_id), "session_type": session_type,
+                                       {"type": "file", "session_id": session_id, "session_type": session_type,
                                         "file_extra": "0"})
                 logger.debug(f"put \"extra\": False")
             else:
                 # 常规对话:
                 _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
                 await get_redis().xadd(_STREAM_IN,
-                                       {"type": "msg", "session_id": str(session_id), "session_type": session_type})
+                                       {"type": "msg", "session_id": session_id, "session_type": session_type})
         await _session_save(session_id, _raw_message, active=True)
     return
 
@@ -302,7 +299,7 @@ async def remove_memory_ai_handle(event: MessageEvent):
             _ = _Messages_dicts[session_id]
         except KeyError:
             await remove_memory_ai.finish("清理已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再清理")
-        if session_type == "GroupMessageEvent":
+        if session_type == "group":
             if event.sender.role == "admin" or event.sender.role == "owner":
                 _Messages_dicts[session_id] = []
                 await _session_delete(session_id)
@@ -326,7 +323,7 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
             await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后运行指令 ai load 再次运行指令 ai save 最后再压缩")
 
         # 只要正常加载, 都会至少有一条system对话, 不需要其他异常处理
-        if session_type == "GroupMessageEvent" and (event.sender.role != "admin" and event.sender.role != "owner"):
+        if session_type == "group" and (event.sender.role != "admin" and event.sender.role != "owner"):
             # 权限不足
             await zip_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
 
@@ -345,10 +342,8 @@ async def zip_db_ai_handle():
 
 @zip_db_ai.got("session_id",prompt="session_id：(默认值为当前会话id)")
 async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
-    try:
-        session_id = int(db_session_id.strip())
-    except ValueError:
-        await zip_db_ai.send("session_id 必须是合法的数字, 您的输入 {}".format(db_session_id))
+    session_id = db_session_id.strip()
+    if not session_id:
         session_id, session_type = get_comments_id(event)
         await zip_db_ai.send("session_id 未提供, 使用 {}".format(session_id))
 
@@ -372,7 +367,7 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
             await zip_db_ai.finish("db is empty, finished")
 
 
-async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bot) -> None:
+async def single_user_event_handle(_session_id: str, _session_type: str, bot: Bot) -> None:
     logger.debug("single_user_event_handle")
     await _ensure_session_loaded(_session_id)
     lock = await get_session_lock(_session_id)
@@ -449,12 +444,12 @@ async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bo
     else:
         _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
 
-    if _session_type == "GroupMessageEvent":
+    if _session_type == "group":
         logger.debug("bot.send_group_msg")
-        await bot.send_group_msg(group_id=_session_id, message=_reply)
-    elif _session_type == "PrivateMessageEvent":
+        await bot.send_group_msg(group_id=int(_session_id), message=_reply)
+    elif _session_type == "private":
         logger.debug("bot.send_private_msg")
-        await bot.send_private_msg(user_id=_session_id, message=_reply)
+        await bot.send_private_msg(user_id=int(_session_id), message=_reply)
     else:
         logger.warning("unknown session type")
     return
@@ -462,18 +457,18 @@ async def single_user_event_handle(_session_id: int, _session_type: str, bot: Bo
 
 class MessageHandleWorkers:
     def __init__(self, bot):
-        self._last_active_time: dict[int, float] = dict()
-        self._messages_counter: dict[int, int] = dict()
-        self._message_type: dict[int, str] = dict()
-        self._is_force_wait: dict[int, int] = dict()
-        self._is_force_wait_lock: dict[int, asyncio.Lock] = dict()
+        self._last_active_time: dict[str, float] = dict()
+        self._messages_counter: dict[str, int] = dict()
+        self._message_type: dict[str, str] = dict()
+        self._is_force_wait: dict[str, int] = dict()
+        self._is_force_wait_lock: dict[str, asyncio.Lock] = dict()
         self._is_force_wait_lock_lock = asyncio.Lock()
         self._consumer_id = f"aggregator-{socket.gethostname()}-{os.getpid()}"
         self.bot = bot
         self._workers: list[asyncio.Task] = []
         self._stop_signal: asyncio.Event = asyncio.Event()
 
-    async def get_is_force_wait_lock(self, session_id: int) -> asyncio.Lock:
+    async def get_is_force_wait_lock(self, session_id: str) -> asyncio.Lock:
         async with self._is_force_wait_lock_lock:
             if session_id in self._is_force_wait_lock:
                 return self._is_force_wait_lock[session_id]
@@ -497,7 +492,7 @@ class MessageHandleWorkers:
                             if self._is_force_wait.get(s_id, 0) > 0:
                                 continue
                             self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) + 1
-                            await get_redis().xadd(_STREAM_OUT, {"session_id": str(s_id), "session_type": s_type})
+                            await get_redis().xadd(_STREAM_OUT, {"session_id": s_id, "session_type": s_type})
                             self._messages_counter[s_id] = 0
                             self._last_active_time[s_id] = asyncio.get_running_loop().time()
                     except Exception as e:
@@ -525,7 +520,7 @@ class MessageHandleWorkers:
                     continue
 
                 msg_id, fields = messages[0]
-                s_id = int(fields["session_id"])
+                s_id = fields["session_id"]
                 s_type = fields["session_type"]
                 lock = await self.get_is_force_wait_lock(s_id)
                 try:
@@ -606,7 +601,7 @@ class MessageHandleWorkers:
 
             try:
                 for data in data_list:
-                    _s_id = int(data["session_id"])
+                    _s_id = data["session_id"]
                     _s_type = data["session_type"]
                     self._message_type[_s_id] = _s_type
                     self._last_active_time[_s_id] = asyncio.get_running_loop().time()
