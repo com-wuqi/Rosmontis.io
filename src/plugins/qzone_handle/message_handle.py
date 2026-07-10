@@ -1,11 +1,14 @@
 from nonebot import on_command, get_driver
 from nonebot import require
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message
+from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent
+from nonebot.adapters import Message
 from nonebot.log import logger
 from nonebot.params import CommandArg
 
 require("src.plugins.Qzone_toolkit")
 import src.plugins.Qzone_toolkit as qzone
+
+from ..shared.adapter_utils import is_feishu_event
 
 _super_users = get_driver().config.superusers
 send_a_text_qzone = on_command("qzone txt")
@@ -13,6 +16,8 @@ send_a_text_qzone = on_command("qzone txt")
 
 @send_a_text_qzone.handle()
 async def send_a_text_qzone_handle(event: MessageEvent, args: Message = CommandArg()):
+    if is_feishu_event(event):
+        return
     if isinstance(event, GroupMessageEvent):
         await send_a_text_qzone.finish("it is a group message")
     if str(event.user_id) not in _super_users:

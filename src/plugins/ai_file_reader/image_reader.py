@@ -113,6 +113,7 @@ async def compress_image_async(input_path, output_path, **kwargs):
 
 
 async def read_image(file_name: str, file_url: str) -> str | None:
+    """下载（或读取本地 file://）图片 → 压缩 → AI 视觉识别 → 返回文本描述。"""
     await _token_bucket.acquire()
     image_path = store.get_plugin_cache_file(f"{time.time()}-{file_name}")
     compressed_image_path = store.get_plugin_cache_file(f"compressed-{time.time()}-{file_name}")
@@ -121,10 +122,16 @@ async def read_image(file_name: str, file_url: str) -> str | None:
     try:
         if mime_type is None:
             raise RuntimeError("guess type error")
-        # 图片下载，压缩
-        _try_download = await public_api.download_file(file_url, str(image_path))
-        if _try_download != 0:
-            raise RuntimeError("download failed")
+        if file_url.startswith("file://"):
+            local_src = file_url[len("file://"):]
+            if not os.path.exists(local_src):
+                raise RuntimeError(f"local file not found: {local_src}")
+            # 直接使用本地文件，不再重复下载
+            image_path = Path(local_src)
+        else:
+            _try_download = await public_api.download_file(file_url, str(image_path))
+            if _try_download != 0:
+                raise RuntimeError("download failed")
         await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))
         if not os.path.exists(str(compressed_image_path)):
             raise RuntimeError("compress image failed")

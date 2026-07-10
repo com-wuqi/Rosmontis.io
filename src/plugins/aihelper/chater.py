@@ -1,16 +1,25 @@
+import asyncio
 import json
 import os
-import re
 import socket
 import traceback
 
 from nonebot import get_driver, require
 from nonebot import on_command, on_message
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, PrivateMessageEvent, Bot
+from nonebot.adapters import Event, Bot
 from nonebot.internal.params import ArgPlainText
 
 from .system_prompts import tool_system_prompts_list
 from ..ai_file_reader import get_file_from_event
+from ..shared.adapter_utils import (
+    resolve_session,
+    get_sender_id,
+    get_message_text,
+    is_attachment_message,
+    can_manage_session,
+    send_reply,
+    get_adapter_name,
+)
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
@@ -21,6 +30,7 @@ from .aihelper_handles import *
 from .session import (
     _Messages_dicts, _ai_switch, _config_settings,
     _session_save, _session_delete, _ensure_session_loaded,
+    store_open_id,
 )
 
 _locks: Dict[str, asyncio.Lock] = {}
@@ -28,8 +38,6 @@ _locks_lock = asyncio.Lock()
 
 _STREAM_IN = _STREAM_INCOMING  # 信息进入
 _STREAM_OUT = _STREAM_TASKS  # task
-
-_superusers = set(get_driver().config.superusers)
 
 start_ai = on_command("ai load",priority=4,block=True)
 stop_ai = on_command("ai save",priority=4,block=True)
@@ -43,29 +51,11 @@ ai_chat = on_message(priority=8, block=False)
 # _debug_message = on_message(priority=1, block=False)
 # 捕获所有信息，备用|调试用途
 
-def is_valid_cq_code(s: str) -> bool:
-    """
-    判断字符串是否为合规的 CQ 码
-    """
-    pattern = r"\[CQ:(?P<type>[a-zA-Z0-9-_.]+)" + r"(?P<params>" + r"(?:,[a-zA-Z0-9-_.]+=[^,\]]*)*" + r"),?\]"
-    return bool(re.fullmatch(pattern, s.strip()))
-
-
 async def get_session_lock(session_id: str) -> asyncio.Lock:
     async with _locks_lock:
         if session_id not in _locks:
             _locks[session_id] = asyncio.Lock()
         return _locks[session_id]
-
-
-def get_comments_id(event: MessageEvent):
-    if isinstance(event, GroupMessageEvent):
-        return str(event.group_id), "group"
-    elif isinstance(event, PrivateMessageEvent):
-        return str(event.user_id), "private"
-    else:
-        logger.error("fail to get comments type : 信息类型获取失败")
-        return str(event.user_id), "unknown"
 
 def generate_zip_message(raw_message:list):
     dialog_lines = []
@@ -142,18 +132,22 @@ async def common_zip_message(_input_msg:list,row:dict) -> list:
 
 
 @start_ai.handle()
-async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
+async def start_ai_handle(event: Event,session: async_scoped_session):
     if config.is_enable_tool_prompt:
         _tool_prompts = tool_system_prompts_list
     else:
         _tool_prompts = []
 
-    session_id,session_type = get_comments_id(event)
+    session_id, session_type = resolve_session(event)
+    session_id:str
+    session_type:str
+    config_sid = get_sender_id(event) if session_type == "private" else session_id
+    # 群聊群聊id,私聊发送者id
     lock = await get_session_lock(session_id)
     async with lock:
         _ai_switch[session_id] = True
 
-        row = await get_config_by_id(sid=session_id,session=session)
+        row = await get_config_by_id(sid=config_sid, session=session)
         _config_settings[session_id] = row
         logger.debug(f"配置: {row.id}")
 
@@ -191,8 +185,8 @@ async def start_ai_handle(event: MessageEvent,session: async_scoped_session):
     await start_ai.finish("收到~")
 
 @stop_ai.handle()
-async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
-    session_id,_ = get_comments_id(event)
+async def stop_ai_handle(event: Event,session: async_scoped_session):
+    session_id,_ = resolve_session(event)
     lock = await get_session_lock(session_id)
     async with lock:
         _ai_switch[session_id] = False
@@ -219,18 +213,21 @@ async def stop_ai_handle(event: MessageEvent,session: async_scoped_session):
 
 
 @ai_chat.handle()
-async def ai_chat_handle(event: MessageEvent, bot: Bot):
+async def ai_chat_handle(event: Event, bot: Bot):
     # 信息预处理，包含文件部分
     # 将所有的信息加入上下文，但是不处理
     # 可以在信息被AI处理之前，就是此处，注入向量检索的结果
-    # _raw_message.append 实现
 
-    session_id,session_type = get_comments_id(event)
-    await _ensure_session_loaded(session_id)
+    session_id, session_type = resolve_session(event)
+    sender_name = get_sender_id(event)
+    if session_type == "private":
+        store_open_id(session_id, sender_name)
+    await _ensure_session_loaded(session_id, sender_name)
     if not _ai_switch.get(session_id, False):
         return  # 直接结束，不回复
-    msg = str(event.get_message()).strip()
-    if not msg:
+    msg = get_message_text(event)
+    has_attachment = is_attachment_message(event)
+    if not msg and not has_attachment:
         return
     if msg.startswith("debug"):
         return
@@ -240,22 +237,20 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
     image_message_index = -1
     lock = await get_session_lock(session_id)
 
-    if is_valid_cq_code(msg):
-        _counter, _msg = await get_file_from_event(event=event, bot=bot)
-        if _counter != 0:
-            await get_redis().xadd(_STREAM_IN,
-                                   {"type": "file", "session_id": session_id, "session_type": session_type,
-                                    "file_extra": "1"})
-            logger.debug(f"put \"extra\": True")
-            is_a_block = True
-            async with lock:
-                image_message_index = len(_raw_message)
-                _raw_message.append({"role": "user", "content": f"{event.user_id}: image is processing"})
-                await _session_save(session_id, _raw_message, active=True)
-            logger.debug("is_valid_cq_code matched, is it a file ?")
-            msg = _msg
-        else:
-            logger.warning(f"read a cq code {msg} , but not find a file")
+    if has_attachment:
+        await get_redis().xadd(_STREAM_IN,
+                               {"type": "file", "session_id": session_id, "session_type": session_type,
+                                "file_extra": "1", "adapter": get_adapter_name(bot)})
+        is_a_block = True
+        async with lock:
+            image_message_index = len(_raw_message)
+            _raw_message.append({"role": "user", "content": f"{sender_name}: file is processing"})
+            await _session_save(session_id, _raw_message, active=True)
+        _counter, _file_text = await get_file_from_event(event=event, bot=bot)
+        if _counter == 0:
+            logger.warning(f"attachment detected but no file processed")
+        elif _file_text:
+            msg = _file_text
 
     async with lock:  # 加锁保护消息列表的读写
         # start_ai 确保存在
@@ -265,34 +260,34 @@ async def ai_chat_handle(event: MessageEvent, bot: Bot):
             if session_type == "private":
                 _raw_message.append({"role": "system", "content": f"{msg}"})
                 await _session_save(session_id, _raw_message, active=True)
-                await ai_chat.finish("system hook by user: {}".format(event.user_id))
-            elif event.sender.role == "admin" or event.sender.role == "owner":
+                await ai_chat.finish("system hook by user: {}".format(sender_name))
+            elif can_manage_session(event, session_type):
                 _raw_message.append({"role": "system", "content": f"{msg}"})
                 await _session_save(session_id, _raw_message, active=True)
-                await ai_chat.finish("system hook by user: {}".format(event.user_id))
+                await ai_chat.finish("system hook by user: {}".format(sender_name))
             else:
-                await ai_chat.finish("system hook auth failed : user: {}".format(event.user_id))
+                await ai_chat.finish("system hook auth failed : user: {}".format(sender_name))
         else:
             if is_a_block:
-                # 含有文件
-                _raw_message[image_message_index] = {"role": "user", "content": f"{event.user_id}: {msg}"}
+                _raw_message[image_message_index] = {"role": "user", "content": f"{sender_name}: {msg}"}
                 await get_redis().xadd(_STREAM_IN,
-                                       {"type": "msg", "session_id": session_id, "session_type": session_type})
+                                       {"type": "msg", "session_id": session_id, "session_type": session_type,
+                                        "adapter": get_adapter_name(bot)})
                 await get_redis().xadd(_STREAM_IN,
                                        {"type": "file", "session_id": session_id, "session_type": session_type,
-                                        "file_extra": "0"})
+                                        "file_extra": "0", "adapter": get_adapter_name(bot)})
                 logger.debug(f"put \"extra\": False")
             else:
-                # 常规对话:
-                _raw_message.append({"role": "user", "content": f"{event.user_id}: {msg}"})
+                _raw_message.append({"role": "user", "content": f"{sender_name}: {msg}"})
                 await get_redis().xadd(_STREAM_IN,
-                                       {"type": "msg", "session_id": session_id, "session_type": session_type})
+                                       {"type": "msg", "session_id": session_id, "session_type": session_type,
+                                        "adapter": get_adapter_name(bot)})
         await _session_save(session_id, _raw_message, active=True)
     return
 
 @remove_memory_ai.handle()
-async def remove_memory_ai_handle(event: MessageEvent):
-    session_id,session_type= get_comments_id(event)
+async def remove_memory_ai_handle(event: Event):
+    session_id,session_type= resolve_session(event)
     lock = await get_session_lock(session_id)
     async with lock:
         try:
@@ -300,7 +295,7 @@ async def remove_memory_ai_handle(event: MessageEvent):
         except KeyError:
             await remove_memory_ai.finish("清理已取消: 首先关闭已有的会话, 然后 ai load 再次 ai save 最后再清理")
         if session_type == "group":
-            if event.sender.role == "admin" or event.sender.role == "owner":
+            if can_manage_session(event, session_type):
                 _Messages_dicts[session_id] = []
                 await _session_delete(session_id)
             else:
@@ -311,10 +306,11 @@ async def remove_memory_ai_handle(event: MessageEvent):
         await remove_memory_ai.finish("清理已完成: 一定要运行 ai save 否则视为放弃删除")
 
 @zip_memory_ai.handle()
-async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session):
-    session_id, session_type = get_comments_id(event)
+async def zip_memory_ai_handle(event: Event,session: async_scoped_session):
+    session_id, session_type = resolve_session(event)
     lock = await get_session_lock(session_id)
-    row = await get_config_by_id(sid=session_id, session=session)
+    config_sid = get_sender_id(event) if session_type == "private" else session_id
+    row = await get_config_by_id(sid=config_sid, session=session)
     # 这里使用的时候内存中应该有配置信息, 但是压缩需要 token , 还是由发起者承担
     async with lock:
         try:
@@ -323,8 +319,7 @@ async def zip_memory_ai_handle(event: MessageEvent,session: async_scoped_session
             await zip_memory_ai.finish("压缩已取消: 首先关闭已有的会话, 然后运行指令 ai load 再次运行指令 ai save 最后再压缩")
 
         # 只要正常加载, 都会至少有一条system对话, 不需要其他异常处理
-        if session_type == "group" and (event.sender.role != "admin" and event.sender.role != "owner"):
-            # 权限不足
+        if session_type == "group" and not can_manage_session(event, session_type):
             await zip_memory_ai.finish("sorry, you are not admin or owner : 抱歉，你不是管理员或群主")
 
         # 执行
@@ -341,14 +336,16 @@ async def zip_db_ai_handle():
 
 
 @zip_db_ai.got("session_id",prompt="session_id：(默认值为当前会话id)")
-async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
+async def zip_db_ai_got_id(event: Event,session: async_scoped_session,db_session_id : str = ArgPlainText("session_id")):
     session_id = db_session_id.strip()
+    session_type = ""
     if not session_id:
-        session_id, session_type = get_comments_id(event)
+        session_id, session_type = resolve_session(event)
         await zip_db_ai.send("session_id 未提供, 使用 {}".format(session_id))
 
     lock = await get_session_lock(session_id)
-    row = await get_config_by_id(sid=session_id, session=session)
+    config_sid = get_sender_id(event) if session_type == "private" else session_id
+    row = await get_config_by_id(sid=config_sid, session=session)
     # 这里使用的时候内存中没有有配置信息, 但是压缩需要 token , 还是由发起者承担
     # 如果按照这个思路处理, 群聊信息将无法被手动压缩, 必须引入参数: 会话id
     # 这里的会话id就是数据库保存的id, 参考 get_comments_id , 群聊为群号, 私聊为个人qq号
@@ -368,6 +365,7 @@ async def zip_db_ai_got_id(event: MessageEvent,session: async_scoped_session,db_
 
 
 async def single_user_event_handle(_session_id: str, _session_type: str, bot: Bot) -> None:
+    """Worker 入口：加载 session → 调用 AI API（含工具调用循环） → send_reply。"""
     logger.debug("single_user_event_handle")
     await _ensure_session_loaded(_session_id)
     lock = await get_session_lock(_session_id)
@@ -444,27 +442,23 @@ async def single_user_event_handle(_session_id: str, _session_type: str, bot: Bo
     else:
         _reply = _res.content or "已执行多次工具调用，但未生成完整回答"
 
-    if _session_type == "group":
-        logger.debug("bot.send_group_msg")
-        await bot.send_group_msg(group_id=int(_session_id), message=_reply)
-    elif _session_type == "private":
-        logger.debug("bot.send_private_msg")
-        await bot.send_private_msg(user_id=int(_session_id), message=_reply)
-    else:
-        logger.warning("unknown session type")
+    await send_reply(bot, _session_id, _session_type, _reply)
     return
 
 
 class MessageHandleWorkers:
-    def __init__(self, bot):
+    """Redis Stream 消费者：main_loop 聚合消息 → handle_merge 入队 → _single_worker 调 AI。"""
+    def __init__(self, bot, bots: dict[str, Bot]):
         self._last_active_time: dict[str, float] = dict()
         self._messages_counter: dict[str, int] = dict()
         self._message_type: dict[str, str] = dict()
+        self._message_adapter: dict[str, str] = dict()
         self._is_force_wait: dict[str, int] = dict()
         self._is_force_wait_lock: dict[str, asyncio.Lock] = dict()
         self._is_force_wait_lock_lock = asyncio.Lock()
         self._consumer_id = f"aggregator-{socket.gethostname()}-{os.getpid()}"
         self.bot = bot
+        self._bots = bots
         self._workers: list[asyncio.Task] = []
         self._stop_signal: asyncio.Event = asyncio.Event()
 
@@ -476,6 +470,7 @@ class MessageHandleWorkers:
             return self._is_force_wait_lock[session_id]
 
     async def handle_merge(self):
+        """将超时或积压的 session 消息入队到 _STREAM_OUT，供 worker 消费。"""
         for s_id, s_type in list(self._message_type.items()):
             if self._messages_counter.get(s_id) is None or self._last_active_time.get(s_id) is None:
                 continue
@@ -492,7 +487,8 @@ class MessageHandleWorkers:
                             if self._is_force_wait.get(s_id, 0) > 0:
                                 continue
                             self._is_force_wait[s_id] = self._is_force_wait.get(s_id, 0) + 1
-                            await get_redis().xadd(_STREAM_OUT, {"session_id": s_id, "session_type": s_type})
+                            adapter = self._message_adapter.get(s_id, "")
+                            await get_redis().xadd(_STREAM_OUT, {"session_id": s_id, "session_type": s_type, "adapter": adapter})
                             self._messages_counter[s_id] = 0
                             self._last_active_time[s_id] = asyncio.get_running_loop().time()
                     except Exception as e:
@@ -500,6 +496,7 @@ class MessageHandleWorkers:
                         traceback.print_exc()
 
     async def _single_worker(self, worker_index: int):
+        """XREADGROUP 消费 _STREAM_OUT → single_user_event_handle → ACK。按 adapter 选择正确 bot。"""
         consumer_name = f"worker-{worker_index}-{socket.gethostname()}-{os.getpid()}"
         while not self._stop_signal.is_set():
             is_event_handled = False
@@ -522,9 +519,11 @@ class MessageHandleWorkers:
                 msg_id, fields = messages[0]
                 s_id = fields["session_id"]
                 s_type = fields["session_type"]
+                adapter = fields.get("adapter", "")
+                worker_bot = self._bots.get(adapter, self.bot)
                 lock = await self.get_is_force_wait_lock(s_id)
                 try:
-                    await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=self.bot)
+                    await single_user_event_handle(_session_id=s_id, _session_type=s_type, bot=worker_bot)
                     is_event_handled = True
                 except Exception as e:
                     logger.error(f"fail to handle message: {e}")
@@ -539,7 +538,8 @@ class MessageHandleWorkers:
                 logger.error(f"fail to handle message: {e}")
                 traceback.print_exc()
             finally:
-                if msg_id is not None:
+                if msg_id is not None and is_event_handled:
+                    # 确定处理了act
                     try:
                         await get_redis().xack(_STREAM_OUT, _GROUP, msg_id)
                     except Exception as e:
@@ -560,6 +560,7 @@ class MessageHandleWorkers:
         self._workers.clear()
 
     async def main_loop(self):
+        """XREADGROUP 消费 _STREAM_IN → 聚合计数/计时 → handle_merge 触发 → ACK。"""
         while True:
             if self._stop_signal.is_set():
                 return
@@ -585,6 +586,7 @@ class MessageHandleWorkers:
                         "session_id": fields["session_id"],
                         "session_type": fields["session_type"],
                         "msg_id": msg_id,
+                        "adapter": fields.get("adapter", get_adapter_name(self.bot)),
                     }
                     if fields["type"] == "file":
                         entry["file_extra"] = fields.get("file_extra", "0") == "1"
@@ -604,6 +606,9 @@ class MessageHandleWorkers:
                     _s_id = data["session_id"]
                     _s_type = data["session_type"]
                     self._message_type[_s_id] = _s_type
+                    adapter = data.get("adapter", "")
+                    if adapter:
+                        self._message_adapter[_s_id] = adapter
                     self._last_active_time[_s_id] = asyncio.get_running_loop().time()
                     if data["type"] == "msg":
                         self._messages_counter[_s_id] = self._messages_counter.get(_s_id, 0) + 1

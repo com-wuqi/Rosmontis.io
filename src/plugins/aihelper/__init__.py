@@ -1,9 +1,13 @@
+import asyncio
+
 import redis.asyncio as aioredis
-from nonebot import get_driver, get_plugin_config
+from nonebot import get_driver, get_plugin_config, Bot
+from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
 from .models import *
+from ..shared.adapter_utils import get_adapter_name
 
 __plugin_meta__ = PluginMetadata(
     name="aiHelper",
@@ -17,6 +21,7 @@ config = _config.aihelper
 driver = get_driver()
 
 _redis: aioredis.Redis | None = None
+_bots: dict[str, Bot] = {}
 message_handle_workers = None
 message_handle_loop = None
 
@@ -25,7 +30,6 @@ _STREAM_TASKS = "ai:tasks"
 _GROUP = "aihelper"
 _SESSION_PREFIX = "ai:session:"
 _SESSION_TTL = config.redis_long_expire_time
-
 
 def get_redis() -> aioredis.Redis:
     if _redis is None:
@@ -38,14 +42,14 @@ if config.is_enable:
     from .chater import *
     from .setupai import *
 
-    @driver.on_bot_connect
-    async def startup(bot: Bot):
+    @driver.on_startup
+    async def init_infra():
+        """初始化 Redis 和 Stream 消费组。若 bot 先于 Redis 连接则在此处补启动 worker。"""
         global _redis, message_handle_workers, message_handle_loop
 
-        if _redis is None:
-            _redis = aioredis.from_url(config.redis_url, decode_responses=True)
-            await _redis.ping()
-            logger.info(f"Redis connected: {config.redis_url}")
+        _redis = aioredis.from_url(config.redis_url, decode_responses=True)
+        await _redis.ping()
+        logger.info(f"Redis connected: {config.redis_url}")
 
         for stream in (_STREAM_INCOMING, _STREAM_TASKS):
             try:
@@ -57,11 +61,27 @@ if config.is_enable:
                 else:
                     raise
 
-        if message_handle_workers is None:
-            message_handle_workers = MessageHandleWorkers(bot)
+        if _bots and message_handle_workers is None:
+            bot = next(iter(_bots.values()))
+            message_handle_workers = MessageHandleWorkers(bot, _bots)
             await message_handle_workers.init_workers()
-        if message_handle_loop is None:
             message_handle_loop = asyncio.create_task(message_handle_workers.main_loop())
+            logger.info("Workers started from on_startup (bots connected before Redis)")
+
+    @driver.on_bot_connect
+    async def on_bot(bot: Bot):
+        """注册 bot 实例，首次连接时启动 worker。若 Redis 未就绪则等待 on_startup 补启动。"""
+        global _bots, message_handle_workers, message_handle_loop
+
+        _bots[get_adapter_name(bot)] = bot
+
+        if _redis is None or message_handle_workers is not None:
+            return
+
+        message_handle_workers = MessageHandleWorkers(bot, _bots)
+        await message_handle_workers.init_workers()
+        message_handle_loop = asyncio.create_task(message_handle_workers.main_loop())
+        logger.info("Workers started from on_bot_connect")
 
     @driver.on_shutdown
     async def shutdown():

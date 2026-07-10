@@ -1,45 +1,34 @@
 from nonebot import on_command
 from nonebot import require
-from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Bot, MessageSegment
+from nonebot.adapters import Event, Bot
 
 from .aihelper_handles import get_comments_by_id, save_comments_to_file
+from ..shared.adapter_utils import resolve_session, build_file_message
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
 
 
-# 设计上, 每个人的私聊都是保存自己的对话
-# 群里只要能够发送信息的人, 都可以保存
-# 群聊只有管理员可以还原信息
-# 配置文件不可以备份和还原
-
-backup_comments = on_command("ai cm bk")  # 备份
-restore_comments = on_command("ai cm rt")  # 还原
+backup_comments = on_command("ai cm bk")
+restore_comments = on_command("ai cm rt")
 
 
 @backup_comments.handle()
-async def backup_comments_handle(bot: Bot, event: MessageEvent, session: async_scoped_session):
-    # 文件按照原样提供
-    # 备份的数据就是 json 字符串, 还原只需要原样放回去应该就行
-    if isinstance(event, GroupMessageEvent):
-        _session_type = "group"
-        _user_id = str(event.group_id)
-        _res = await get_comments_by_id(sid=str(event.group_id), session=session)
-    else:
-        _session_type = "user"
-        _user_id = str(event.user_id)
-        _res = await get_comments_by_id(sid=str(event.user_id), session=session)
+async def backup_comments_handle(bot: Bot, event: Event, session: async_scoped_session):
+    session_id, session_type = resolve_session(event)
+    _res = await get_comments_by_id(sid=session_id, session=session)
 
-    if _res is not None and _res.message:
-
-        _remote_path = await save_comments_to_file(_raw_msg=_res.message, msg_type=_session_type, user_id=_user_id)
-        if _remote_path == "":
-            await backup_comments.finish("fail")
-
-        _file = MessageSegment("file", {"file": f"file://{_remote_path}"})
-        await backup_comments.finish(_file)
-    else:
+    if _res is None or not _res.message:
         await backup_comments.finish("is empty")
+
+    _remote_path = await save_comments_to_file(
+        _raw_msg=_res.message, msg_type=session_type, user_id=session_id
+    )
+    if _remote_path == "":
+        await backup_comments.finish("fail")
+
+    _file = await build_file_message(bot, _remote_path)
+    await backup_comments.finish(_file)
 
 
 @restore_comments.handle()
