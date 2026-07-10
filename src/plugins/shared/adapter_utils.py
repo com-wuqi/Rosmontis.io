@@ -387,7 +387,7 @@ async def send_reply(bot: Bot, session_id: str, session_type: str, content) -> N
             payload = json.dumps({"text": content})
             msg_type = "text"
         else:
-            payload = content.serialize()[1]
+            payload = json.dumps(content.data)
             msg_type = getattr(content, "type", "post") or "post"
         await bot.send_msg(
             receive_id_type=receive_id_type,
