@@ -52,7 +52,6 @@ Rosmontis/
 │   ├── public_apis/         # 公开API服务，文件上传
 │   ├── self_build_tts/      # 自建TTS服务（实验性）
 │   ├── qzone_handle/        # QQ空间接口处理
-│   ├── hitokoto/            # 一言服务
 │   ├── easyhelper/          # 简易助手功能
 │   └── hooked_mcp_tools/    # MCP工具钩子
 ├── migrations/              # 数据库迁移文件

@@ -151,3 +151,4 @@ testplugins/
 *test*.db
 *user*.md
 docs/design*.md
+cache/*
