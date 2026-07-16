@@ -160,6 +160,15 @@ async def read_image(file_name: str, file_url: str) -> str | None:
             ],
             temperature=1.0,
         )
+        usage = getattr(chat_completion, "usage", None) or {}
+        logger.info(
+            f"read_image 成功 | "
+            f"req_id={getattr(chat_completion, 'id', 'N/A')} | "
+            f"model={getattr(chat_completion, 'model', 'N/A')} | "
+            f"tokens: in={getattr(usage, 'prompt_tokens', '?')} | "
+            f"out={getattr(usage, 'completion_tokens', '?')} | "
+            f"total={getattr(usage, 'total_tokens', '?')}"
+        )
         _return = chat_completion.choices[0].message
         if not _return or not _return.content:
             logger.warning(
