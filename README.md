@@ -1,5 +1,11 @@
 # Rosmontis - 现代化AI机器人
 
+## 这是开发分支！
+
+这里的版本不保证可用性，请前往[releases](https://github.com/com-wuqi/Rosmontis.io/releases)下载`Pre-release`或`Latest`
+版本  
+我们正在进行重大迁移和重构，不建议使用这个分支的代码
+
 ![License](https://img.shields.io/badge/License-MIT-white.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![NoneBot](https://img.shields.io/badge/NoneBot-v2.x-green)

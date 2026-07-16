@@ -27,10 +27,8 @@ require("src.plugins.public_apis")
 from src.plugins.public_apis.shared_funcs import download_file
 
 if TYPE_CHECKING:
-    from nonebot.adapters.onebot.v11 import Bot as OB11Bot
-    from nonebot.adapters.onebot.v11 import MessageSegment as OB11MessageSegment
-    from nonebot.adapters.feishu import Bot as FeishuBot
-    from nonebot.adapters.feishu import MessageSegment as FeishuMessageSegment
+    pass
+
 
 # ============================================================
 # 通用工具
@@ -285,7 +283,7 @@ async def download_to_cache(bot: Bot, attachment: dict) -> str | None:
         return str(tmp_path) if code == 0 else None
 
     if file_id and is_onebot(bot):
-        info = await bot.call_api("get_private_file_url", file_id=file_id)
+        info = await bot.call_api("get_private_file_url", file_id=file_id)  # 此处存疑
         tmp_path = store.get_plugin_cache_file(f"dl_{file_name}")
         code = await download_file(info["url"], str(tmp_path))
         return str(tmp_path) if code == 0 else None
