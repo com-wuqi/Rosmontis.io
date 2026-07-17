@@ -322,39 +322,39 @@ async def download_attachment(bot: Bot, attachment: dict) -> tuple[str, bytes] |
             pass
 
 
-async def upload_file_to_platform(bot: Bot, file_name: str, file_data: bytes) -> str | None:
-    """上传文件到平台，返回平台标识符（OneBot URL / Feishu file_key）。当前仅 backupHelper 使用。"""
-    if is_onebot(bot):
-        tmp_path = store.get_plugin_cache_file(f"up_{file_name}")
-        try:
-            async with aiofiles.open(tmp_path, "wb") as f:
-                await f.write(file_data)
+async def upload_file_to_platform(bot: Bot, file_path: str, file_name: str = "") -> str | None:
+    """上传本地文件到平台，返回平台标识符。上传后自动 unlink 源文件。"""
+    if not file_name:
+        file_name = os.path.basename(file_path)
+    try:
+        if is_onebot(bot):
             require("src.plugins.public_apis")
             from src.plugins.public_apis import upload_file
-            return await upload_file(str(tmp_path))
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-
-    if is_feishu(bot):
-        ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "stream"
-        type_map = {
-            "pdf": "pdf", "doc": "doc", "docx": "doc",
-            "xls": "xls", "xlsx": "xls",
-            "ppt": "ppt", "pptx": "ppt",
-            "mp4": "mp4", "opus": "opus",
-        }
-        file_type = type_map.get(ext, "stream")
-        resp = await bot.post_file(file_type=file_type, file_name=file_name, file=file_data)
-        code = resp.get("code", -1)
-        if code != 0:
-            logger.warning(f"feishu upload_file failed: {resp}")
-            return None
-        return resp.get("data", {}).get("file_key")
-
-    return None
+            return await upload_file(file_path)
+        if is_feishu(bot):
+            async with aiofiles.open(file_path, "rb") as f:
+                file_data = await f.read()
+            ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "stream"
+            type_map = {
+                "pdf": "pdf", "doc": "doc", "docx": "doc",
+                "xls": "xls", "xlsx": "xls", "ppt": "ppt", "pptx": "ppt",
+                "mp4": "mp4", "opus": "opus",
+            }
+            resp = await bot.post_file(
+                file_type=type_map.get(ext, "stream"),
+                file_name=file_name, file=file_data,
+            )
+            code = resp.get("code", -1)
+            if code != 0:
+                logger.warning(f"upload_file_to_platform feishu failed: {resp}")
+                return None
+            return resp.get("data", {}).get("file_key")
+        return None
+    finally:
+        try:
+            os.unlink(file_path)
+        except OSError:
+            pass
 
 # ============================================================
 # 消息发送与构造
@@ -411,46 +411,25 @@ async def send_reply_with_event(bot: Bot, event: Event, content,
 
 
 async def build_file_message(bot: Bot, file_ref: str, file_name: str = "") -> MessageSegment:
-    """构造文件消息段。file_ref 为本地路径或远程 URL。Feishu 自动完成上传。"""
+    """构造文件消息段。file_ref 为本地路径或 HTTP URL。内部委托 upload_file_to_platform。"""
+    if not file_name:
+        file_name = os.path.basename(file_ref)
+    if file_ref.startswith(("http://", "https://")):
+        tmp = store.get_plugin_cache_file(f"bfm_{file_name}")
+        code = await download_file(file_ref, str(tmp))
+        if code != 0:
+            logger.warning(f"build_file_message download failed: {file_ref}")
+            return MessageSegment.text("[file]")
+        file_ref = str(tmp)
+    ref = await upload_file_to_platform(bot, file_ref, file_name)
+    if ref is None:
+        return MessageSegment.text("[file]")
     if is_onebot(bot):
         from nonebot.adapters.onebot.v11 import MessageSegment as OB11MS
-        return OB11MS("file", {"file": f"file://{file_ref}"})
+        return OB11MS("file", {"file": f"file://{ref}"})
     if is_feishu(bot):
-        if not file_name:
-            file_name = os.path.basename(file_ref)
-        if file_ref.startswith(("http://", "https://")):
-            tmp = store.get_plugin_cache_file(f"bfm_{file_name}")
-            code = await download_file(file_ref, str(tmp))
-            if code != 0:
-                logger.warning(f"build_file_message download failed: {file_ref}")
-                return MessageSegment.text("[file]")
-            local = str(tmp)
-        else:
-            local = file_ref
-        ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "stream"
-        type_map = {
-            "pdf": "pdf", "doc": "doc", "docx": "doc",
-            "xls": "xls", "xlsx": "xls", "ppt": "ppt", "pptx": "ppt",
-            "mp4": "mp4", "opus": "opus",
-        }
-        async with aiofiles.open(local, "rb") as f:
-            file_data = await f.read()
-        resp = await bot.post_file(
-            file_type=type_map.get(ext, "stream"),
-            file_name=file_name, file=file_data,
-        )
-        if local != file_ref:
-            try:
-                os.unlink(local)
-            except OSError:
-                pass
-        code = resp.get("code", -1)
-        if code != 0:
-            logger.warning(f"build_file_message feishu upload failed: {resp}")
-            return MessageSegment.text("[file]")
-        file_key = resp.get("data", {}).get("file_key")
         from nonebot.adapters.feishu import MessageSegment as FeishuMS
-        return FeishuMS.file(file_key=file_key, file_name=file_name)
+        return FeishuMS.file(file_key=ref, file_name=file_name)
     return MessageSegment.text("[file]")
 
 

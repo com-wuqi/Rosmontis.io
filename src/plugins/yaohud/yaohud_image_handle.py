@@ -8,7 +8,7 @@ from nonebot import require
 from nonebot.log import logger
 
 from . import config
-from .sharedFuncs import TokenBucket, download_file, upload_file
+from .sharedFuncs import TokenBucket, download_file
 from .signHelper import build_headers
 
 require("nonebot_plugin_localstore")
@@ -53,9 +53,7 @@ async def get_acg(img_type: str):
                 file_jpg = store.get_plugin_cache_file(f"acg_adaptive-{time.time()}.jpg")
                 _res = await download_file(url=photo_url, save_path=str(file_jpg))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(file_jpg))
-                    file_jpg.unlink()  # 删除文件
-                    return _remote_path  # 返回远程地址
+                    return str(file_jpg)
                 else:
                     logger.warning("download failed")
                     return -1

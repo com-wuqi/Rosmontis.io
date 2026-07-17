@@ -8,7 +8,7 @@ from nonebot import require
 from nonebot.log import logger
 
 from . import config
-from .sharedFuncs import TokenBucket, download_file, upload_file
+from .sharedFuncs import TokenBucket, download_file
 from .signHelper import build_headers
 
 require("nonebot_plugin_localstore")
@@ -103,9 +103,7 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
 
                 _res = await download_file(url=music_url, save_path=str(_music))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(_music))
-                    _music.unlink()  # 删除文件
-                    return _remote_path  # 返回远程地址
+                    return str(_music)
                 else:
                     return -1
             except HTTPStatusError as e:

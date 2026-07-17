@@ -82,21 +82,7 @@ async def download_gpt_sovits_tts_file(get_request_url: str):
         if stat.st_size == 0:
             return None, "文件下载失败：内容为空"
 
-        try:
-            remote_path = await public_apis.upload_file(path=str(temp_path))
-        except Exception as e:
-            logger.warning("文件上传失败: {}".format(e))
-            return None, "文件上传失败"
-
-        if not remote_path:
-            return None, "文件上传失败"
-
-        try:
-            temp_path.unlink(missing_ok=True)
-        except Exception as e:
-            logger.warning(f"清理临时文件失败: {e}")
-
-        return remote_path, None
+        return str(temp_path), None
 
     except httpx.HTTPStatusError as e:
         msg = f"API 返回错误: {e.response.status_code}"
@@ -136,9 +122,7 @@ async def qwen3_tts_customvoice(text: str):
     logger.debug(f"qwen3_tts_customvoice job started")
     file_path, _ = await wait_for_job(job)
     logger.debug(f"qwen3_tts_customvoice local {file_path}")
-    _remote_path = await public_apis.upload_file(file_path)
-    logger.debug(f"qwen3_tts_customvoice remote {_remote_path}")
-    return _remote_path
+    return file_path
 
 
 async def qwen3_tts_voice_design(text: str):
@@ -153,9 +137,7 @@ async def qwen3_tts_voice_design(text: str):
     logger.debug(f"qwen3_tts_voice_design job started")
     file_path, _ = await wait_for_job(job)
     logger.debug(f"qwen3_tts_voice_design local {file_path}")
-    _remote_path = await public_apis.upload_file(file_path)
-    logger.debug(f"qwen3_tts_voice_design remote {_remote_path}")
-    return _remote_path
+    return file_path
 
 
 async def qwen3_tts_base_save_prompt(ref_txt: str, ref_aud: str):
@@ -170,9 +152,7 @@ async def qwen3_tts_base_save_prompt(ref_txt: str, ref_aud: str):
     logger.debug(f"qwen3_tts_base_save_prompt job started")
     file_path, _ = await wait_for_job(job)
     logger.debug(f"qwen3_tts_base_save_prompt local {file_path}")
-    _remote_path = await public_apis.upload_file(file_path)
-    logger.debug(f"qwen3_tts_base_save_prompt remote {_remote_path}")
-    return _remote_path
+    return file_path
 
 
 async def qwen3_tts_base_gen(file_path: str, text: str):
@@ -187,9 +167,7 @@ async def qwen3_tts_base_gen(file_path: str, text: str):
     logger.debug(f"qwen3_tts_base_gen job started")
     file_path, _ = await wait_for_job(job)
     logger.debug(f"qwen3_tts_base_gen local {file_path}")
-    _remote_path = await public_apis.upload_file(file_path)
-    logger.debug(f"qwen3_tts_base_gen remote {_remote_path}")
-    return _remote_path
+    return file_path
 
 
 async def get_private_file_from_url(url: str, file_name: str, user_id: int):

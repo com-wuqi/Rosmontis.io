@@ -1,12 +1,16 @@
-from nonebot import on_command
-from nonebot import require
+import time
+
+import aiofiles
+from nonebot import on_command, require
 from nonebot.adapters import Event, Bot
 
-from .aihelper_handles import get_comments_by_id, save_comments_to_file
-from ..shared.adapter_utils import resolve_session, build_file_message
-
 require("nonebot_plugin_orm")
+require("nonebot_plugin_localstore")
+import nonebot_plugin_localstore as store
 from nonebot_plugin_orm import async_scoped_session
+
+from .aihelper_handles import get_comments_by_id
+from ..shared.adapter_utils import resolve_session, build_file_message
 
 
 backup_comments = on_command("ai cm bk")
@@ -21,13 +25,13 @@ async def backup_comments_handle(bot: Bot, event: Event, session: async_scoped_s
     if _res is None or not _res.message:
         await backup_comments.finish("is empty")
 
-    _remote_path = await save_comments_to_file(
-        _raw_msg=_res.message, msg_type=session_type, user_id=session_id
+    local_path = store.get_plugin_cache_file(
+        f"{session_id}_{session_type}_{time.time()}.txt"
     )
-    if _remote_path == "":
-        await backup_comments.finish("fail")
+    async with aiofiles.open(local_path, "w", encoding="utf-8") as f:
+        await f.write(_res.message)
 
-    _file = await build_file_message(bot, _remote_path)
+    _file = await build_file_message(bot, str(local_path))
     await backup_comments.finish(_file)
 
 
