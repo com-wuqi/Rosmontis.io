@@ -13,7 +13,6 @@
 import json
 import os
 import time
-from typing import TYPE_CHECKING
 
 import aiofiles
 from nonebot import require
@@ -25,10 +24,6 @@ import nonebot_plugin_localstore as store
 
 require("src.plugins.public_apis")
 from src.plugins.public_apis.shared_funcs import download_file
-
-if TYPE_CHECKING:
-    pass
-
 
 # ============================================================
 # 通用工具
@@ -225,7 +220,7 @@ def get_attachment_segments(event: Event) -> list[dict]:
         {
           "type":      "image" | "file" | "audio" | "video",
           "file_name": str,
-          "file_id":   str | None,   ← OneBot 专属，NapCat 的 file_id
+          "file_id":   str | None,   ← OneBot 专属，file_id
           "file_url":  str | None,   ← OneBot 专属，直链 URL
           "file_key":  str | None,   ← Feishu 专属，上传后返回的 key
         },
@@ -243,6 +238,8 @@ def get_attachment_segments(event: Event) -> list[dict]:
             entry["file_id"] = seg.data.get("file_id")
             entry["file_url"] = seg.data.get("url")
             entry["file_key"] = None
+            from nonebot.adapters.onebot.v11 import GroupMessageEvent
+            entry["session_type"] = "group" if isinstance(event, GroupMessageEvent) else "private"
         elif is_feishu_event(event):
             key = seg.data.get("file_key") or seg.data.get("image_key")
             entry["file_key"] = key
@@ -283,7 +280,8 @@ async def download_to_cache(bot: Bot, attachment: dict) -> str | None:
         return str(tmp_path) if code == 0 else None
 
     if file_id and is_onebot(bot):
-        info = await bot.call_api("get_private_file_url", file_id=file_id)  # 此处存疑
+        api_name = "get_group_file_url" if attachment.get("session_type") == "group" else "get_private_file_url"
+        info = await bot.call_api(api_name, file_id=file_id)
         tmp_path = store.get_plugin_cache_file(f"dl_{file_name}")
         code = await download_file(info["url"], str(tmp_path))
         return str(tmp_path) if code == 0 else None

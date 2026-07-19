@@ -71,7 +71,6 @@ async def request_help_handle(args: Message = CommandArg()):
     today -- 历史上的今天
     mcp-status -- MCP 服务状态
     mcp-reload -- MCP 手动重载，需要管理员
-    qzone txt [文本1] [文本2]... --- (不同文本换行)发动态,需要 SUPERUSERS
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:
