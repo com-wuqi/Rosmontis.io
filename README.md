@@ -98,6 +98,9 @@ Rosmontis/
    ```bash
    pip install -r requirements.txt
    ```
+4. **配置snowluma**
+   请参考 `方式二：Docker部署`   
+   官方文档 `https://snowluma.github.io/guide/deploy/docker.html`
 
 4. **数据库初始化**
    ```bash
@@ -129,7 +132,7 @@ Rosmontis/
    # or `python bot.py`
    ```
 
-### 方式二：Docker部署 (缺少测试)
+### 方式二：Docker部署
 
 1. **克隆项目**
    ```bash
@@ -140,15 +143,26 @@ Rosmontis/
 2. **配置环境变量**
    ```bash
    vim .env.prod
-   # 编辑 .env.prod 文件，配置数据库连接等
+   vim docker-compose.yml
+   # 编辑 .env.prod 文件，配置数据库连接, SnowLuma连接，修改默认密钥 等
+   # 编辑 snowluma 配置
    ```
+   **额外注意检查**：  
+   `ONEBOT_WS_URLS` `PUBLICAPI__UPLOAD_WS_URL` 应一致（`ONEBOT_WS_URLS`格式略不同)   
+   `ONEBOT_ACCESS_TOKEN` `PUBLICAPI__UPLOAD_WS_TOKEN` 应一致  
+   Snowluma :
+   > VNC / noVNC 默认密码 vncpasswd 务必改掉，否则你的 QQ 桌面在公网上裸奔。
 
 3. **启动服务**
    ```bash
    docker-compose --env-file .env.prod up -d
    ```
+4. **获取snowluma密码**
+   ```bash
+   docker logs snowluma 2>&1 | grep -E "临时密码|initial credentials" | tail -n 1
+   ```
 
-4. **配置SnowLuma**
+5. **配置SnowLuma**
    - 访问 `http://127.0.0.1:5099` (SnowLuma管理界面)
    - 打开 `节点配置` (或访问 `http://127.0.0.1:5099/config`)
    - 编辑 `WS 服务端`
@@ -158,6 +172,15 @@ Rosmontis/
       - 信息格式：`数组`
       - 角色：`Universal`
       - 授权Token: 与 `.env.prod` 中的 `ONEBOT_ACCESS_TOKEN` 一致
+6. **登陆noVNC**
+   默认端口为 `NOVNC_PORT` 6081   
+   然后正常登陆qq
+
+7. **检查连接**
+   ```bash
+   sudo docker logs -f rosbot # 检查是否连接成功
+   ```
+   ~~然后就没了~~
 
 ## 🔧 功能配置
 

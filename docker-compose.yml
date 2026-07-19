@@ -1,7 +1,4 @@
 # Rosmontis.io Docker Compose 配置
-version: '3.8'
-
-
 services:
   # 机器人服务
   rosbot:

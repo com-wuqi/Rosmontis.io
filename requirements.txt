@@ -6,17 +6,20 @@
 #
 
 aiodns==4.0.4
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   aiohttp
 aiofiles==25.1.0
     # via -r requirements.txt
 aiohappyeyeballs==2.6.2
     # via
     #   -r requirements.txt
     #   aiohttp
-aiohttp==3.14.1
+aiohttp[speedups]==3.14.1
     # via
     #   -r requirements.txt
     #   kubernetes
+    #   nonebot2
 aiomysql==0.3.2
     # via -r requirements.txt
 aiosignal==1.4.0
@@ -32,6 +35,7 @@ alembic==1.18.4
 annotated-doc==0.0.4
     # via
     #   -r requirements.txt
+    #   fastapi
     #   typer
 annotated-types==0.7.0
     # via
@@ -93,7 +97,9 @@ bracex==2.6
     #   -r requirements.txt
     #   wcmatch
 brotli==1.2.0
-    # via -r requirements.txt
+    # via
+    #   -r requirements.txt
+    #   aiohttp
 brotlicffi==1.2.0.1
     # via -r requirements.txt
 build==1.5.0
@@ -101,7 +107,9 @@ build==1.5.0
     #   -r requirements.txt
     #   chromadb
 cashews==7.5.0
-    # via nonebot-adapter-feishu
+    # via
+    #   -r requirements.txt
+    #   nonebot-adapter-feishu
 certifi==2026.6.17
     # via
     #   -r requirements.txt
@@ -182,6 +190,10 @@ exceptiongroup==1.3.1
     #   -r requirements.txt
     #   nonebot-plugin-htmlrender
     #   nonebot2
+fastapi==0.139.2
+    # via
+    #   -r requirements.txt
+    #   nonebot2
 fastapi-cli==0.0.27
     # via -r requirements.txt
 filelock==3.29.4
@@ -224,6 +236,7 @@ h2==4.3.0
     # via
     #   -r requirements.txt
     #   e2b
+    #   httpx
 hf-xet==1.5.1
     # via
     #   -r requirements.txt
@@ -241,7 +254,7 @@ httptools==0.8.0
     # via
     #   -r requirements.txt
     #   uvicorn
-httpx==0.28.1
+httpx[http2]==0.28.1
     # via
     #   -r requirements.txt
     #   chromadb
@@ -249,6 +262,7 @@ httpx==0.28.1
     #   e2b-code-interpreter
     #   huggingface-hub
     #   mcp
+    #   nonebot2
     #   openai
     #   respx
 httpx-sse==0.4.3
@@ -403,7 +417,7 @@ nonebot-plugin-waiter==0.8.1
     # via
     #   -r requirements.txt
     #   nonebot-plugin-alconna
-nonebot2==2.5.0
+nonebot2[aiohttp,fastapi,httpx,websockets]==2.5.0
     # via
     #   -r requirements.txt
     #   nonebot-adapter-feishu
@@ -527,6 +541,7 @@ protobuf==7.35.1
     #   -r requirements.txt
     #   e2b
     #   googleapis-common-protos
+    #   nonebot-adapter-feishu
     #   onnxruntime
     #   opentelemetry-proto
 pybase64==1.4.3
@@ -542,11 +557,14 @@ pycparser==3.0
     #   -r requirements.txt
     #   cffi
 pycryptodome==3.23.0
-    # via nonebot-adapter-feishu
+    # via
+    #   -r requirements.txt
+    #   nonebot-adapter-feishu
 pydantic==2.13.4
     # via
     #   -r requirements.txt
     #   chromadb
+    #   fastapi
     #   mcp
     #   nonebot-adapter-onebot
     #   nonebot-adapter-qq
@@ -718,6 +736,7 @@ sse-starlette==3.4.5
 starlette==1.3.1
     # via
     #   -r requirements.txt
+    #   fastapi
     #   mcp
     #   sse-starlette
 tarina==0.7.5
@@ -760,6 +779,7 @@ typing-extensions==4.15.0
     #   beautifulsoup4
     #   chromadb
     #   e2b
+    #   fastapi
     #   grpcio
     #   huggingface-hub
     #   mcp
@@ -787,6 +807,7 @@ typing-extensions==4.15.0
 typing-inspection==0.4.2
     # via
     #   -r requirements.txt
+    #   fastapi
     #   mcp
     #   pydantic
     #   pydantic-settings
@@ -806,6 +827,7 @@ uvicorn[standard]==0.49.0
     #   chromadb
     #   fastapi-cli
     #   mcp
+    #   nonebot2
 uvloop==0.22.1
     # via
     #   -r requirements.txt
@@ -825,6 +847,7 @@ websocket-client==1.9.0
 websockets==16.0
     # via
     #   -r requirements.txt
+    #   nonebot2
     #   uvicorn
 wrapt==2.2.2
     # via
