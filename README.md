@@ -86,6 +86,7 @@ Rosmontis/
    - MySQL 8.0+ 或 SQLite
    - Redis 8+ (用于消息队列与会话持久化)
    - SnowLuma 实例(docker) (请参考`https://snowluma.github.io`)
+      - 使用即代表您已经同意 SnowLuma 项目的相关协议
 
 2. **创建虚拟环境**
    ```bash
@@ -133,6 +134,8 @@ Rosmontis/
    ```
 
 ### 方式二：Docker部署
+
+要求同上
 
 1. **克隆项目**
    ```bash

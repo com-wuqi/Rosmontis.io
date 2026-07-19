@@ -11,7 +11,7 @@ services:
     environment:
       # 从 .env.prod 加载，这里可以覆盖
       - SQLALCHEMY_DATABASE_URL=mysql+aiomysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data
-      - ONEBOT_WS_URLS=["ws://snowluma:3001/onebot/v11/ws"]
+      - ONEBOT_WS_URLS=["ws://snowluma:3001/"]
       - PUBLICAPI__UPLOAD_WS_URL=ws://snowluma:3001
       - PUBLICAPI__IS_ENABLE_UPLOAD=true
       - AIHELPER__REDIS_URL=redis://redis:6379/0
