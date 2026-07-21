@@ -1,11 +1,10 @@
-import asyncio
 import json
 import os
 import socket
 import traceback
 
-from nonebot import get_driver, require
 from nonebot import on_command, on_message
+from nonebot import require
 from nonebot.adapters import Event, Bot
 from nonebot.internal.params import ArgPlainText
 
@@ -41,7 +40,7 @@ _STREAM_OUT = _STREAM_TASKS  # task
 
 start_ai = on_command("ai load",priority=4,block=True)
 stop_ai = on_command("ai save",priority=4,block=True)
-remove_memory_ai = on_command("ai remove",priority=80,block=False)
+remove_memory_ai = on_command("ai remove", priority=4, block=True)
 zip_memory_ai = on_command("ai zp mm",priority=80,block=False) # 缩写一下
 zip_db_ai = on_command("ai zp db",priority=80,block=False)
 
@@ -234,7 +233,7 @@ async def ai_chat_handle(event: Event, bot: Bot):
 
     _raw_message: list = _Messages_dicts[session_id]
     is_a_block = False
-    image_message_index = -1
+    file_message_index = -1
     lock = await get_session_lock(session_id)
 
     if has_attachment:
@@ -243,10 +242,12 @@ async def ai_chat_handle(event: Event, bot: Bot):
                                 "file_extra": "1", "adapter": get_adapter_name(bot)})
         is_a_block = True
         async with lock:
-            image_message_index = len(_raw_message)
-            _raw_message.append({"role": "user", "content": f"{sender_name}: file is processing"})
+            file_message_index = len(_raw_message)
+            _raw_message.append(
+                {"role": "user", "content": f"会话：{session_id} 用户：{sender_name}: file is processing"})
             await _session_save(session_id, _raw_message, active=True)
         _counter, _file_text = await get_file_from_event(event=event, bot=bot)
+        # 文件处理入口，这个函数可能通过redis恢复执行吗(event可以序列化/反序列化吗)
         if _counter == 0:
             logger.warning(f"attachment detected but no file processed")
         elif _file_text:
@@ -269,7 +270,8 @@ async def ai_chat_handle(event: Event, bot: Bot):
                 await ai_chat.finish("system hook auth failed : user: {}".format(sender_name))
         else:
             if is_a_block:
-                _raw_message[image_message_index] = {"role": "user", "content": f"{sender_name}: {msg}"}
+                _raw_message[file_message_index] = {"role": "user",
+                                                    "content": f"会话：{session_id} 用户：{sender_name}：{msg}"}
                 await get_redis().xadd(_STREAM_IN,
                                        {"type": "msg", "session_id": session_id, "session_type": session_type,
                                         "adapter": get_adapter_name(bot)})
@@ -278,7 +280,7 @@ async def ai_chat_handle(event: Event, bot: Bot):
                                         "file_extra": "0", "adapter": get_adapter_name(bot)})
                 logger.debug(f"put \"extra\": False")
             else:
-                _raw_message.append({"role": "user", "content": f"{sender_name}: {msg}"})
+                _raw_message.append({"role": "user", "content": f"会话：{session_id} 用户：{sender_name}：{msg}"})
                 await get_redis().xadd(_STREAM_IN,
                                        {"type": "msg", "session_id": session_id, "session_type": session_type,
                                         "adapter": get_adapter_name(bot)})
@@ -372,6 +374,9 @@ async def single_user_event_handle(_session_id: str, _session_type: str, bot: Bo
     _event_setting = _config_settings[_session_id]
     # 配置文件， _ensure_session_loaded确保其存在
     _raw_message: list = _Messages_dicts[_session_id]
+    if not _raw_message:
+        logger.warning("single_user_event_handle: _raw_message")
+        return
     _res = None
     async with lock:  #
         try:

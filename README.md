@@ -318,6 +318,12 @@ python -m pytest tests/ -v -s
 
 ```
 
+## 内置配置和内置提示词
+
+请参考 [.env.prod](.env.prod) 和每个插件目录下的 `config.py` 进行调整  
+[example_mcp_config.py](src/plugins/mcp_support/example_mcp_config.py) 里面存放了参考，建议复制为 `mcp_config.py` 使用  
+`src/plugins/aihelper/md_prompts` 目录下所有不是以 `design-` 开通的markdown文件均会被加载
+
 ## 🔍 故障排除
 
 ### 常见问题

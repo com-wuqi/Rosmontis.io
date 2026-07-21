@@ -12,6 +12,7 @@ class ScopedConfig(BaseModel):
     max_workers: int = Field(default=10, ge=1)
     redis_url: str = "redis://localhost:6379/0"
     redis_long_expire_time: int = 7 * 24 * 3600  # 7 day
+    is_enable_design_prompts: bool = False  # 是否启用含有 design- 标记的提示词
 
 
 class Config(BaseModel):
