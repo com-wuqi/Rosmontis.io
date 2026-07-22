@@ -8,7 +8,7 @@ from nonebot import require
 from nonebot.log import logger
 
 from . import config
-from .sharedFuncs import TokenBucket, download_file, upload_file
+from .sharedFuncs import TokenBucket, download_file
 from .signHelper import build_headers
 
 require("nonebot_plugin_localstore")
@@ -35,9 +35,7 @@ async def get_index_tts2(voice_txt: str, voice_from: str):
                 file_mp3 = store.get_plugin_cache_file(f"index_tts2-{time.time()}.mp3")
                 _res = await download_file(url=mp3_url, save_path=str(file_mp3))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(file_mp3))
-                    file_mp3.unlink()
-                    return _remote_path
+                    return str(file_mp3)
                 else:
                     return -1
             except HTTPStatusError as e:
@@ -67,9 +65,7 @@ async def get_yaohu_picture(txt: str):
                 file_png = store.get_plugin_cache_file(f"yaohu_ai_picture-{time.time()}.jpg")
                 _res = await download_file(url=png_url, save_path=str(file_png))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(file_png))
-                    file_png.unlink()
-                    return _remote_path
+                    return str(file_png)
                 else:
                     return -1
 

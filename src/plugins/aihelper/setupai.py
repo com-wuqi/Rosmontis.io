@@ -1,15 +1,16 @@
 from nonebot import get_driver, require
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Message, MessageEvent, GroupMessageEvent
+from nonebot.adapters import Event,Message
 from nonebot.params import ArgPlainText, CommandArg
 from nonebot.typing import T_State
+
+from ..shared.adapter_utils import resolve_session, get_sender_id
 
 require("nonebot_plugin_orm")
 from .aihelper_handles import *
 from nonebot_plugin_orm import async_scoped_session
 
-_superusers = get_driver().config.selfhostaiusers
-_superusers = [int(k) for k in _superusers]
+_superusers = set(get_driver().config.selfhostaiusers)
 # 这里提供通过对话修改数据库的方法
 
 setup_ai = on_command("ai cf add") # 增加配置文件
@@ -28,14 +29,13 @@ async def edit_config_handle():
 
 
 @choose_config.handle()
-async def choose_config_handle(event: MessageEvent, session: async_scoped_session, config_id: Message = CommandArg()):
-    if isinstance(event, GroupMessageEvent):
+async def choose_config_handle(event: Event, session: async_scoped_session, config_id: Message = CommandArg()):
+    if resolve_session(event)[1] != "private":
         await choose_config.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     _config_id = config_id.extract_plain_text().strip()
     if not _config_id.isdigit():
         await choose_config.finish("config_id 需要是纯数字")
-    # if int(_config_id) == 1
-    _res = await change_is_enable_by_id(config_id=int(_config_id), session=session, user_id=event.user_id)
+    _res = await change_is_enable_by_id(config_id=int(_config_id), session=session, user_id=get_sender_id(event))
     if _res == -1:
         await choose_config.finish("fail")
     else:
@@ -45,13 +45,13 @@ async def choose_config_handle(event: MessageEvent, session: async_scoped_sessio
         )
 
 @show_config.handle()
-async def show_config_handle(event: MessageEvent,session: async_scoped_session):
-    if isinstance(event, GroupMessageEvent):
+async def show_config_handle(event: Event, session: async_scoped_session):
+    if resolve_session(event)[1] != "private":
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
-    configs = await get_all_config_by_id(sid=event.user_id,session=session)
+    configs = await get_all_config_by_id(sid=get_sender_id(event), session=session)
     _result = []
     if configs is not None:
-        _result.append("user_id: {}".format(event.user_id))
+        _result.append("user_id: {}".format(get_sender_id(event)))
         _result.append("")
         for in_config in configs:
             _result.append("config:")
@@ -70,8 +70,8 @@ async def show_config_handle(event: MessageEvent,session: async_scoped_session):
 
 
 @switch_config.handle()
-async def switch_config_handle(event: MessageEvent, session: async_scoped_session, switch: Message = CommandArg()):
-    if isinstance(event, GroupMessageEvent):
+async def switch_config_handle(event: Event, session: async_scoped_session, switch: Message = CommandArg()):
+    if resolve_session(event)[1] != "private":
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     switch_list = switch.extract_plain_text().strip().split()
     if len(switch_list) != 2:
@@ -81,7 +81,7 @@ async def switch_config_handle(event: MessageEvent, session: async_scoped_sessio
     if switch_list[0] == "1":
         await switch_config.finish("操作失败")
     _res = await switch_is_enable_by_id(config_id=int(switch_list[0]), session=session,
-                                        target=bool(int(switch_list[1])), user_id=event.user_id)
+                                        target=bool(int(switch_list[1])), user_id=get_sender_id(event))
     if _res != 0:
         await switch_config.finish("404 not found")
     else:
@@ -89,16 +89,16 @@ async def switch_config_handle(event: MessageEvent, session: async_scoped_sessio
 
 
 @delete_config.handle()
-async def delete_config_handle(event: MessageEvent, session: async_scoped_session, config_id: Message = CommandArg()):
-    if isinstance(event, GroupMessageEvent):
+async def delete_config_handle(event: Event, session: async_scoped_session, config_id: Message = CommandArg()):
+    if resolve_session(event)[1] != "private":
         await delete_config.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     config_id = config_id.extract_plain_text().strip()
     if config_id == "1":
         await delete_config.finish("操作失败")
     if not config_id.strip() or not config_id.strip().isdigit():
-        # isdigit() 判断纯数字
         await delete_config.finish("没有输入或者输入不合法: 要求提供配置id, 可以通过ai cf show获取")
-    _res = await del_config_by_config_id_and_uid(session=session, config_id=int(config_id.strip()), uid=event.user_id)
+    _res = await del_config_by_config_id_and_uid(session=session, config_id=int(config_id.strip()),
+                                                 uid=get_sender_id(event))
     if _res == 0:
         await delete_config.finish("操作成功")
     else:
@@ -106,21 +106,21 @@ async def delete_config_handle(event: MessageEvent, session: async_scoped_sessio
 
 
 @setup_ai.handle()
-async def setup_ai_handle(event: MessageEvent,state: T_State):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_handle(event: Event, state: T_State):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
-    await setup_ai.send(Message("setupai begin now : cancel取消"))
-    if event.user_id in _superusers:
-        state["user_id"] = event.user_id
+    await setup_ai.send("setupai begin now : cancel取消")
+    if get_sender_id(event) in _superusers:
+        state["user_id"] = get_sender_id(event)
     else:
-        await setup_ai.finish("user : {} try to run setup_ai but not SA".format(event.user_id))
+        await setup_ai.finish("user : {} try to run setup_ai but not SA".format(get_sender_id(event)))
 
 
 @setup_ai.got("url", prompt="url：")
-async def setup_ai_url(state: T_State,event: MessageEvent,url: str = ArgPlainText()):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_url(state: T_State, event: Event, url: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not url.strip():
         await setup_ai.reject("url 不能为空，请重新输入：")
@@ -131,9 +131,9 @@ async def setup_ai_url(state: T_State,event: MessageEvent,url: str = ArgPlainTex
     logger.debug("url : {}".format(state["url"]))
 
 @setup_ai.got("apikey", prompt="apikey：")
-async def setup_ai_apikey(state: T_State,event: MessageEvent,apikey: str = ArgPlainText()):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_apikey(state: T_State, event: Event, apikey: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not apikey.strip():
         await setup_ai.reject("apikey 不能为空，请重新输入：")
@@ -144,10 +144,9 @@ async def setup_ai_apikey(state: T_State,event: MessageEvent,apikey: str = ArgPl
     logger.debug("apikey : {}".format(state["apikey"]))
 
 @setup_ai.got("max_length", prompt="max_length：")
-async def setup_ai_max_length(state: T_State,event: MessageEvent,max_length: str = ArgPlainText()):
-
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_max_length(state: T_State, event: Event, max_length: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not max_length.strip():
         await setup_ai.reject("max_length 不能为空，请重新输入：")
@@ -162,10 +161,9 @@ async def setup_ai_max_length(state: T_State,event: MessageEvent,max_length: str
     logger.debug("max_length : {}".format(state["max_length"]))
 
 @setup_ai.got("temperature", prompt="temperature：")
-async def setup_ai_temperature(state: T_State,event: MessageEvent,temperature: str = ArgPlainText()):
-
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_temperature(state: T_State, event: Event, temperature: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not temperature.strip():
         await setup_ai.reject("temperature 不能为空，请重新输入：")
@@ -181,9 +179,9 @@ async def setup_ai_temperature(state: T_State,event: MessageEvent,temperature: s
 
 
 @setup_ai.got("model_name", prompt="model_name：")
-async def setup_ai_model_name(state: T_State, event: MessageEvent, model_name: str = ArgPlainText()):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id, event.group_id))
+async def setup_ai_model_name(state: T_State, event: Event, model_name: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not model_name.strip():
         await setup_ai.reject("model_name 不能为空，请重新输入：")
@@ -198,9 +196,9 @@ async def setup_ai_model_name(state: T_State, event: MessageEvent, model_name: s
     await setup_ai.send(f"已成功选择模型：{model_name}")
 
 @setup_ai.got("system_prompt", prompt="system_prompt：")
-async def setup_ai_system_prompt(state: T_State,event: MessageEvent,system_prompt: str = ArgPlainText()):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id,event.group_id))
+async def setup_ai_system_prompt(state: T_State, event: Event, system_prompt: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     if not system_prompt.strip():
         await setup_ai.reject("system_prompt 不能为空，请重新输入：")
@@ -211,14 +209,14 @@ async def setup_ai_system_prompt(state: T_State,event: MessageEvent,system_promp
     logger.debug("system_prompt : {}".format(state["system_prompt"]))
 
 @setup_ai.got("confirm", prompt="do you confirm? y/n")
-async def setup_ai_confirm(state: T_State,session: async_scoped_session,event: MessageEvent, confirm: str = ArgPlainText()):
-    if isinstance(event, GroupMessageEvent):
-        logger.warning("user : {} try to run setup_ai in group : {}".format(event.user_id, event.group_id))
+async def setup_ai_confirm(state: T_State, session: async_scoped_session, event: Event, confirm: str = ArgPlainText()):
+    if resolve_session(event)[1] != "private":
+        logger.warning("user tried to run setup_ai in group")
         await setup_ai.finish("处于安全考虑, 这个操作不允许在群聊中进行")
     await setup_ai.send("url:{},\nkey:{},\nmodel_name:{},\nmax_length:{},\ntemperature:{}\nsystem_prompt:{}".format(state["url"],state["apikey"],state["model_name"],int(state["max_length"]),float(state["temperature"]),state["system_prompt"]))
     if confirm.strip() == "y":
         new_setting = Settings(url=state["url"], api_key=state["apikey"], model_name=state["model_name"],
-                               max_length=int(state["max_length"]), user_id=int(state["user_id"]),
+                               max_length=int(state["max_length"]), user_id=str(state["user_id"]),
                                system=state["system_prompt"], is_enabled=False)
         session.add(new_setting)
         await session.flush()

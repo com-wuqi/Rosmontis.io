@@ -114,6 +114,20 @@ mcp_configs = [
     #     },
     #     prefix="github"
     # ),
+    # McpServerConfig(
+    #     # 除非你明白你在配置什么，否则请不要使用
+    #     # 详细配置文档
+    #     name="snowluma",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@snowluma/mcp"],
+    #     env={
+    #         "SNOWLUMA_MCP_ENDPOINT": "http://127.0.0.1:3000/",
+    #         "SNOWLUMA_MCP_TOKEN": "<your token here>",
+    #         # "SNOWLUMA_MCP_MODE": "write" # 写模式会把 invoke_action 暴露给 MCP 客户端。只有在你信任当前客户端、模型和会话时才开启。
+    #     },
+    #     prefix="snowluma"
+    # ),
 ]
 """
 其他例子

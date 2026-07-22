@@ -1,5 +1,11 @@
 # Rosmontis - 现代化AI机器人
 
+## 这是开发分支！
+
+这里的版本不保证可用性，请前往[releases](https://github.com/com-wuqi/Rosmontis.io/releases)下载`Pre-release`或`Latest`
+版本  
+我们正在进行重大迁移和重构，不建议使用这个分支的代码
+
 ![License](https://img.shields.io/badge/License-MIT-white.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![NoneBot](https://img.shields.io/badge/NoneBot-v2.x-green)
@@ -34,6 +40,7 @@
 ### 🔧 企业级特性
 
 - **Sentry监控**: 生产环境错误追踪
+- **Redis**: 消息队列（Stream）+ 会话持久化（Hash），支持故障自愈
 - **APScheduler**: 分布式任务调度
 - **数据库支持**: MySQL + SQLite双引擎
 - **Docker部署**: 完整的容器化方案
@@ -50,8 +57,6 @@ Rosmontis/
 │   ├── yaohud/              # 妖狐数据API，多媒体处理
 │   ├── public_apis/         # 公开API服务，文件上传
 │   ├── self_build_tts/      # 自建TTS服务（实验性）
-│   ├── qzone_handle/        # QQ空间接口处理
-│   ├── hitokoto/            # 一言服务
 │   ├── easyhelper/          # 简易助手功能
 │   └── hooked_mcp_tools/    # MCP工具钩子
 ├── migrations/              # 数据库迁移文件
@@ -71,7 +76,7 @@ Rosmontis/
 
 ## 🚀 快速开始
 
-另附旧版教程，更详细但是更复杂 [extra_README.md](extra_README.md)
+另附旧版教程，~~更详细但是更复杂~~ 可能已经过时但仍有参考价值 [extra_README.md](extra_README.md)
 
 ### 方式一：手动部署 (推荐)
 
@@ -79,7 +84,9 @@ Rosmontis/
    - Python 3.12+
    - Node.js 18+ (用于MCP支持)
    - MySQL 8.0+ 或 SQLite
-   - Napcat 实例 (请参考`https://napneko.github.io/`)
+   - Redis 8+ (用于消息队列与会话持久化)
+   - SnowLuma 实例(docker) (请参考`https://snowluma.github.io`)
+      - 使用即代表您已经同意 SnowLuma 项目的相关协议
 
 2. **创建虚拟环境**
    ```bash
@@ -92,6 +99,9 @@ Rosmontis/
    ```bash
    pip install -r requirements.txt
    ```
+4. **配置snowluma**
+   请参考 `方式二：Docker部署`   
+   官方文档 `https://snowluma.github.io/guide/deploy/docker.html`
 
 4. **数据库初始化**
    ```bash
@@ -100,8 +110,11 @@ Rosmontis/
    ```
    ```bash
    vim .env.prod
-   # 编辑 .env.prod 文件，配置数据库连接, Napcat连接等
+   # 编辑 .env.prod 文件，配置数据库连接, SnowLuma连接，修改默认密钥 等
    ```
+   **额外注意检查**：  
+   `ONEBOT_WS_URLS` `PUBLICAPI__UPLOAD_WS_URL` 应一致（`ONEBOT_WS_URLS`格式略不同)   
+   `ONEBOT_ACCESS_TOKEN` `PUBLICAPI__UPLOAD_WS_TOKEN` 应一致
 
    ```bash
    # 应用数据库迁移
@@ -116,11 +129,13 @@ Rosmontis/
 
 6. **启动机器人**
    ```bash
-   # nb run # 由于未知的原因，这样启动会导致 ctrl+C 关闭时报错
-   python bot.py
+   nb run 
+   # or `python bot.py`
    ```
 
-### 方式二：Docker部署 (缺少测试)
+### 方式二：Docker部署
+
+要求同上
 
 1. **克隆项目**
    ```bash
@@ -131,20 +146,44 @@ Rosmontis/
 2. **配置环境变量**
    ```bash
    vim .env.prod
-   # 编辑 .env.prod 文件，配置数据库连接等
+   vim docker-compose.yml
+   # 编辑 .env.prod 文件，配置数据库连接, SnowLuma连接，修改默认密钥 等
+   # 编辑 snowluma 配置
    ```
+   **额外注意检查**：  
+   `ONEBOT_WS_URLS` `PUBLICAPI__UPLOAD_WS_URL` 应一致（`ONEBOT_WS_URLS`格式略不同)   
+   `ONEBOT_ACCESS_TOKEN` `PUBLICAPI__UPLOAD_WS_TOKEN` 应一致  
+   Snowluma :
+   > VNC / noVNC 默认密码 vncpasswd 务必改掉，否则你的 QQ 桌面在公网上裸奔。
 
 3. **启动服务**
    ```bash
    docker-compose --env-file .env.prod up -d
    ```
+4. **获取snowluma密码**
+   ```bash
+   docker logs snowluma 2>&1 | grep -E "临时密码|initial credentials" | tail -n 1
+   ```
 
-4. **配置NapCatQQ**
-   - 访问 `http://127.0.0.1:6099` (NapCat管理界面)
-   - 添加WebSocket服务器配置：
-      - Host: 0.0.0.0
-      - Port: 3001
-      - Token: 与 `.env.prod` 中的 `ONEBOT_ACCESS_TOKEN` 一致
+5. **配置SnowLuma**
+   - 访问 `http://127.0.0.1:5099` (SnowLuma管理界面)
+   - 打开 `节点配置` (或访问 `http://127.0.0.1:5099/config`)
+   - 编辑 `WS 服务端`
+      - 主机: `0.0.0.0`
+      - 端口: `3001`
+      - 路径：`/`
+      - 信息格式：`数组`
+      - 角色：`Universal`
+      - 授权Token: 与 `.env.prod` 中的 `ONEBOT_ACCESS_TOKEN` 一致
+6. **登陆noVNC**
+   默认端口为 `NOVNC_PORT` 6081   
+   然后正常登陆qq
+
+7. **检查连接**
+   ```bash
+   sudo docker logs -f rosbot # 检查是否连接成功
+   ```
+   ~~然后就没了~~
 
 ## 🔧 功能配置
 
@@ -174,6 +213,10 @@ Rosmontis/
 ```env
 # AI助手总开关
 AIHELPER__IS_ENABLE=true
+
+# Redis连接（消息队列+会话持久化）
+AIHELPER__REDIS_URL=redis://localhost:6379/0
+AIHELPER__REDIS_LONG_EXPIRE_TIME=604800
 
 # 文件读取能力
 AI_FILE_READER__IS_ENABLE=true
@@ -275,6 +318,12 @@ python -m pytest tests/ -v -s
 
 ```
 
+## 内置配置和内置提示词
+
+请参考 [.env.prod](.env.prod) 和每个插件目录下的 `config.py` 进行调整  
+[example_mcp_config.py](src/plugins/mcp_support/example_mcp_config.py) 里面存放了参考，建议复制为 `mcp_config.py` 使用  
+`src/plugins/aihelper/md_prompts` 目录下所有不是以 `design-` 开通的markdown文件均会被加载
+
 ## 🔍 故障排除
 
 ### 常见问题
@@ -284,7 +333,7 @@ python -m pytest tests/ -v -s
    - 确认数据库用户权限
    - 验证连接字符串格式
 
-2. **NapCat连接失败**
+2. **SnowLuma连接失败**
    - 检查WebSocket服务器配置
    - 确认端口3001未被占用
    - 验证Token一致性
@@ -350,8 +399,7 @@ LOG_LEVEL=DEBUG python bot.py
 
 ## 🔗 相关项目
 
-- [NapCatQQ](https://github.com/NapNeko/NapCatQQ) - QQ协议实现
-- [qzone-toolkit](https://github.com/gfhdhytghd/qzone-toolkit) - QQ空间工具
+- [SnowLuma](https://github.com/SnowLuma/SnowLuma) - QQ协议实现
 - [quick-e2b-sandbox](https://github.com/sansenjian/quick-e2b-sandbox) - 代码沙箱
 
 ## 📞 支持与联系

@@ -1,9 +1,12 @@
+import asyncio
+
 from nonebot import get_driver, on_command
 from nonebot import get_plugin_config
-from nonebot.adapters.onebot.v11 import MessageEvent, PrivateMessageEvent
+from nonebot.adapters import Event
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
+from ..shared.adapter_utils import get_sender_id, resolve_session
 
 __plugin_meta__ = PluginMetadata(
     name="mcp_support",
@@ -33,11 +36,13 @@ async def _init_mcp_support():
 @driver.on_shutdown
 async def _shutdown_mcp_support():
     if mcp_manger is not None:
-        await mcp_manger.close_all()
+        try:
+            await mcp_manger.close_all()
+        except asyncio.CancelledError:
+            pass
 
 
-_superusers = get_driver().config.superusers
-_superusers = [int(k) for k in _superusers]
+_superusers = set(get_driver().config.superusers)
 mcp_status = on_command("mcp-status")
 mcp_reload = on_command("mcp-reload")  # 需要特权
 
@@ -50,8 +55,10 @@ async def mcp_status_handle():
 
 
 @mcp_reload.handle()
-async def mcp_reload_handle(event: MessageEvent):
-    if (event.user_id not in _superusers) or (not isinstance(event, PrivateMessageEvent)):
+async def mcp_reload_handle(event: Event):
+    sender = get_sender_id(event)
+    _, session_type = resolve_session(event)
+    if sender not in _superusers or session_type != "private":
         await mcp_reload.finish("Permission denied")
         return
     if mcp_manger is None:

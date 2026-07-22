@@ -1,20 +1,23 @@
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageSegment, MessageEvent, GroupMessageEvent, Message
+from nonebot.adapters import Event, Bot, Message
 from nonebot.params import CommandArg
 
 from .yaohud_ai_handle import get_index_tts2, get_weijin, get_yaohu_picture
+from ..shared.adapter_utils import resolve_session, build_file_message, send_reply_with_event
 
 index_tts2 = on_command("yaohud-tts")
 weijin_check = on_command("weijin")
 yaohu_picture_ai = on_command("aidraw")
 
+
 @index_tts2.handle()
-async def index_tts2_handle(event: MessageEvent, args: Message = CommandArg()):
+async def index_tts2_handle(event: Event, bot: Bot, args: Message = CommandArg()):
     """
     IndexTTS2-语音合成 , 当前支持角色, 英文支持不行
     用法  [角色] [内容]
     """
-    if isinstance(event, GroupMessageEvent):
+    _, session_type = resolve_session(event)
+    if session_type != "private":
         await index_tts2.finish("403")
     data = args.extract_plain_text().strip().split()
     if len(data) != 2:
@@ -22,9 +25,8 @@ async def index_tts2_handle(event: MessageEvent, args: Message = CommandArg()):
     _res = await get_index_tts2(voice_from=data[0], voice_txt=data[1])
     if _res == -1:
         await index_tts2.finish("fail")
-    else:
-        _file = MessageSegment("file", {"file": f"file://{_res}"})
-        await index_tts2.finish(_file)
+    _file = await build_file_message(bot, _res)
+    await send_reply_with_event(bot, event, _file)
 
 
 @weijin_check.handle()
@@ -34,24 +36,22 @@ async def weijin_check_handle(args: Message = CommandArg()):
         await weijin_check.finish(str(True))
         return
     _res = await get_weijin(txt=string)
-    if _res:
-        await weijin_check.finish(str(True))
-    else:
-        await weijin_check.finish(str(False))
+    await weijin_check.finish(str(bool(_res)))
 
 
 @yaohu_picture_ai.handle()
-async def yaohu_picture_ai_handle(args: Message = CommandArg()):
+async def yaohu_picture_ai_handle(event: Event, bot: Bot, args: Message = CommandArg()):
     string = args.extract_plain_text().strip()
     if string == "" or string is None:
-        await yaohu_picture_ai.finish("need txt")
+        await send_reply_with_event(bot, event, "need txt")
         return
     _check = await get_weijin(txt=string)
     if not _check:
-        await yaohu_picture_ai.finish("failed before check")
+        await send_reply_with_event(bot, event, "failed before check")
+        return
     _res = await get_yaohu_picture(txt=string)
     if _res == -1:
-        await yaohu_picture_ai.finish("fail")
-    else:
-        _file = MessageSegment("file", {"file": f"file://{_res}"})
-        await yaohu_picture_ai.finish(_file)
+        await send_reply_with_event(bot, event, "fail")
+        return
+    _file = await build_file_message(bot, _res)
+    await send_reply_with_event(bot, event, _file)

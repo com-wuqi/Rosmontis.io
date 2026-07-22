@@ -30,19 +30,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.14'
-          cache: 'pip'
+          enable-cache: true
 
       - name: Run quick tests before build
         env:
           DRIVER: "~aiohttp"
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m pytest tests/ -v -s --tb=short --disable-warnings || echo "Tests failed, but continuing with build (check separate test workflow for details)"
+          uv sync --frozen --all-groups
+          uv run pytest tests/ -v --tb=short --disable-warnings || echo "Tests failed, but continuing with build (check separate test workflow for details)"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4

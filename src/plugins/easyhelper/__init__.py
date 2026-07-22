@@ -1,6 +1,6 @@
 from nonebot import get_plugin_config
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Message
+from nonebot.adapters import Message
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 
@@ -67,12 +67,10 @@ async def request_help_handle(args: Message = CommandArg()):
     applemu [搜索名] [id | null] -- 下载音乐(apple音乐)
     """,
         "other": """
-    yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
     mcp-status -- MCP 服务状态
     mcp-reload -- MCP 手动重载，需要管理员
-    qzone txt [文本1] [文本2]... --- (不同文本换行)发动态,需要 SUPERUSERS
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

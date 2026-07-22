@@ -1,6 +1,7 @@
 import asyncio
 import time
 import traceback
+import os
 from pathlib import Path
 
 from markitdown import MarkItDown
@@ -60,9 +61,16 @@ async def read_markitdown_file(file_name: str, file_url: str) -> str | None:
     file_path = store.get_plugin_cache_file(f"{time.time()}-{file_name}")
     _return = None
     try:
-        _try_download = await public_api.download_file(file_url, str(file_path))
-        if _try_download != 0:
-            raise RuntimeError("download failed")
+        if file_url.startswith("file://"):
+            local_src = file_url[len("file://"):]
+            if not os.path.exists(local_src):
+                raise RuntimeError(f"local file not found: {local_src}")
+            # 直接使用本地文件，不再重复下载
+            file_path = Path(local_src)
+        else:
+            _try_download = await public_api.download_file(file_url, str(file_path))
+            if _try_download != 0:
+                raise RuntimeError("download failed")
         _return = await async_convert(file_path)
         logger.debug(f"read markitdown success:\n{_return}")
     except Exception as e:

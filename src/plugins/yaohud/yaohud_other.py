@@ -1,5 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Message
+from nonebot.adapters import Message
 from nonebot.params import CommandArg
 
 from .yaohud_other_handle import whois, today
