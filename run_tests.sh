@@ -4,5 +4,8 @@
 
 set -e
 
+echo "Syncing dependencies..."
+uv sync --frozen --all-groups
+
 echo "Running tests in tests/ directory..."
-python -m pytest tests/ -v --tb=short
+uv run pytest tests/ -v --tb=short
