@@ -1,10 +1,25 @@
 # Rosmontis - 现代化AI机器人
 
-## 这是开发分支！
+> [!WARNING]
+> **⚠️ 此分支已废弃且不再维护 (Deprecated & Unmaintained)**
+>
 
-这里的版本不保证可用性，请前往[releases](https://github.com/com-wuqi/Rosmontis.io/releases)下载`Pre-release`或`Latest`
-版本  
-我们正在进行重大迁移和重构，不建议使用这个分支的代码
+## 🛑 分支废弃声明 (Deprecation Notice)
+
+**当前分支 (`v2-dev`) 已正式废弃，并停止维护。**
+
+### 状态说明
+
+* **开发状态**：已冻结 (Frozen), 已经合并到主分支
+* **维护状态**：不再接受新的 Pull Request / Merge Request
+* **安全更新**：不再提供安全补丁, 不再更新依赖
+
+### 迁移指南
+
+请所有用户和开发者迁移到我们的活跃分支：
+👉 **[切换到 `master` 分支](../tree/master)**
+
+如果您有关于迁移的问题，请在 `master` 分支下提交 Issue，或联系项目维护者。
 
 ![License](https://img.shields.io/badge/License-MIT-white.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
