@@ -112,7 +112,7 @@ select = [
     "W",     # pycodestyle warnings
     "E",     # pycodestyle errors
     "I",     # isort
-    "C90",   # mccabe
+    # "C90",   # mccabe (圈复杂度是度量指标而非bug)
     "N",     # pep8-naming
     "PL",    # pylint
     "UP",    # pyupgrade
@@ -136,10 +136,10 @@ select = [
     "RET",   # flake8-return
     "SIM",   # flake8-simplify
     "SLOT",  # flake8-slots
-    "TID",   # flake8-tidy-imports
-    "TC",    # flake8-type-checking
+    # "TID",   # flake8-tidy-imports (nonebot2 插件惯用相对导入)
+    # "TC",    # flake8-type-checking (nonebot2 运行时依赖注入，放入 TYPE_CHECKING 会导致 handler 无法解析)
     "ARG",   # flake8-unused-arguments
-    "PTH",   # flake8-use-pathlib
+    # "PTH",   # flake8-use-pathlib (纯风格统一，无性能收益，部分替换有陷阱)
     # "ERA",   # eradicate
     # "FAST",  # FastAPI
     "PERF",  # Perflint
@@ -155,16 +155,36 @@ ignore = [
     # "RUF001",  # ambiguous-unicode-character-string
     # "RUF002",  # ambiguous-unicode-character-docstring
     # "RUF003",  # ambiguous-unicode-character-comment
-    # "ANN201",  # missing-return-type-undocumented-public-function
+    "ANN201", # missing-return-type-undocumented-public-function
     "ANN202",  # missing-return-type-private-function
     "ANN401",  # any-type
+    "ANN001", # missing-type-function-argument
+    "ANN204", # missing-return-type-special-method (__init__ -> None 低价值)
+    "BLE001", # blind-except
+    "TID", # flake8-tidy-imports (nonebot2 插件惯用相对导入)
+    "TC", # flake8-type-checking (nonebot2 运行时依赖注入，放入 TYPE_CHECKING 会导致 handler 无法解析)
+    "PLW0603", # global-statement (插件间暴露共享资源)
+    "TRY003", # raise-vanilla-args (需要自定义异常类，过度工程化)
+    "ASYNC240", # blocking-path-method-in-async-function (本地文件 stat 在微秒级，to_thread 反而增加调度开销)
+    "TRY300", # try-consider-else (破坏原有代码结构，可读性变差)
     "COM812",  # missing-trailing-comma
+    "I", # isort (nonebot2 插件导入顺序敏感，可能引发循环导入)
     "PLC0415", # import-outside-top-level
 ]
 allowed-confusables = ["，", "。", "“", "”", "：", "；", "？", "！", "【", "】", "《", "》", "…", "—", "（", "）", "、"]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
+
+[tool.ruff.lint.per-file-ignores]
+"src/plugins/**/__init__.py" = ["F403", "F405"]
+"src/plugins/aihelper/aihelper_handles.py" = ["F403", "F405"]
+"src/plugins/aihelper/chater.py" = ["F403", "F405"]
+"src/plugins/aihelper/setupai.py" = ["F403", "F405"]
+"src/plugins/mcp_support/buildin_mcp.py" = ["F403", "F405"]
+"compare_env.py" = ["T201"]
+"server/fileupload.py" = ["T201"]
+"src/plugins/public_apis/napcatqq_upload_stream.py" = ["T201"]
 
 [tool.pyright]
 # For Pylance/Pyright configurations, see https://microsoft.github.io/pyright/#/configuration.

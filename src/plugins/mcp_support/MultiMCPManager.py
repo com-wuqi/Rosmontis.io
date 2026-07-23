@@ -1,7 +1,7 @@
 import asyncio
 import traceback
 from contextlib import AbstractAsyncContextManager
-from typing import Dict, Any
+from typing import Any
 
 import httpx
 from mcp import ClientSession
@@ -21,13 +21,13 @@ except ModuleNotFoundError:
 class MultiMCPManager:
     def __init__(self, configs: list[McpServerConfig] = mcp_configs):
         self.configs = configs  # 配置
-        self.sessions: Dict[str, ClientSession] = {}  # 保存会话
-        self.tool_map: Dict[str, str] = {}  # 修正名称: MCP服务名
-        self.tool_original_map: Dict[str, str] = {}  # 修饰后的名称-原工具名
+        self.sessions: dict[str, ClientSession] = {}  # 保存会话
+        self.tool_map: dict[str, str] = {}  # 修正名称: MCP服务名
+        self.tool_original_map: dict[str, str] = {}  # 修饰后的名称-原工具名
         self.all_tools: list = []  # 工具的列表
         self._tasks: list[asyncio.Task] = []  # 后台任务列表
         self._stop_event = asyncio.Event()  # 关闭事件
-        self._ready_events: Dict[str, asyncio.Event] = {}  # 事件就绪列表: 初始化时创建
+        self._ready_events: dict[str, asyncio.Event] = {}  # 事件就绪列表: 初始化时创建
 
     async def connect_all(self):
         """ 初始化所有mcp连接 """
@@ -48,9 +48,16 @@ class MultiMCPManager:
                     timeout=mcp_init_timeout
                 )
                 logger.info("All MCP servers ready")
-            except asyncio.TimeoutError:
-                not_ready = [name for name, ev in self._ready_events.items() if not ev.is_set()]
-                logger.warning(f"connect_all TimeoutError: MCP servers ready within : {not_ready}")
+            except TimeoutError:
+                not_ready = [
+                    name
+                    for name, ev in self._ready_events.items()
+                    if not ev.is_set()
+                ]
+                logger.warning(
+                    "connect_all TimeoutError: MCP servers ready within : "
+                    f"{not_ready}"
+                )
 
             except Exception as e:
                 logger.warning(f"connect_all Failed: {e}")
@@ -122,11 +129,11 @@ class MultiMCPManager:
                 env=cfg.env
             )
             return stdio_client(server_params)
-        elif cfg.transport == "sse":
+        if cfg.transport == "sse":
             if not cfg.url:
                 raise ValueError(f"sse '{cfg.name}'need url")
             return sse_client(cfg.url, timeout=cfg.timeout)
-        elif cfg.transport == "streamable-http":
+        if cfg.transport == "streamable-http":
             if not cfg.url:
                 raise ValueError(f"streamable-http '{cfg.name}'need url")
 
@@ -138,8 +145,7 @@ class MultiMCPManager:
                 url=cfg.url,
                 http_client=custom_client,
             )
-        else:
-            raise ValueError(f"transport {cfg.transport} not supported")
+        raise ValueError(f"transport {cfg.transport} not supported")
 
 
     def _reset_tool_data(self):
@@ -158,7 +164,7 @@ class MultiMCPManager:
                 tools_response = await session.list_tools()
                 for tool in tools_response.tools:
                     original_name = tool.name  # 原始名称
-                    prefixed_name = f"{prefix}_{original_name}"  #
+                    prefixed_name = f"{prefix}_{original_name}"
                     if prefixed_name in self.tool_map:
                         logger.warning(f"tool {prefixed_name} already used")
                         prefixed_name = f"{name}_{prefix}_{original_name}"
@@ -181,7 +187,7 @@ class MultiMCPManager:
             except Exception as e:
                 logger.warning(f"server: {name} failed to get tools: {e}")
 
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]):
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any]):
         """ 调用工具 """
         server_name = self.tool_map.get(tool_name)
         original_name = self.tool_original_map.get(tool_name)
@@ -193,9 +199,9 @@ class MultiMCPManager:
 
         _text = ""
         result = await session.call_tool(name=original_name, arguments=arguments)
-        if hasattr(result, 'content') and result.content:
+        if hasattr(result, "content") and result.content:
             _text = "\n".join(
-                item.text if hasattr(item, 'text') else str(item)
+                item.text if hasattr(item, "text") else str(item)
                 for item in result.content
             )
         return _text or "执行成功但无输出"
@@ -214,7 +220,7 @@ class MultiMCPManager:
         self.sessions.clear()
         self._reset_tool_data()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """ MCP 状态 """
         return {
             "connected_servers": list(self.sessions.keys()),

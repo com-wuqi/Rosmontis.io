@@ -35,7 +35,9 @@ if config.is_enable_gpt_sovits:
         if not get_request_url:
             logger.warning("gpt_sovits failed to get_request_url")
             await gpt_tts.finish(f"gpt_sovits gpt_tts_handle : {get_request_url}")
-        _remote_path, _msg = await tts_api_handle.download_gpt_sovits_tts_file(get_request_url)
+        _remote_path, _msg = await tts_api_handle.download_gpt_sovits_tts_file(
+            get_request_url
+        )
         if not _remote_path:
             logger.warning(f"gpt_sovits failed: {_msg}")
             await gpt_tts.finish(f"gpt_sovit failed: {_msg}")
@@ -50,7 +52,9 @@ if config.is_enable_qwen3_customvoice:
 
 
     @qwen3_customvoice.handle()
-    async def qwen3_customvoice_handle(event: Event, bot: Bot, arg: Message = CommandArg()):
+    async def qwen3_customvoice_handle(
+        event: Event, bot: Bot, arg: Message = CommandArg()
+    ):
         _, session_type = resolve_session(event)
         if session_type != "private":
             await qwen3_customvoice.finish("it is not a private session")
@@ -66,12 +70,16 @@ if config.is_enable_qwen3_voice_design:
     qwen3_voice_design = on_command("qwen3-vdesign")
 
     @qwen3_voice_design.handle()
-    async def qwen3_voice_design_handle(event: Event, bot: Bot, arg: Message = CommandArg()):
+    async def qwen3_voice_design_handle(
+        event: Event, bot: Bot, arg: Message = CommandArg()
+    ):
         _, session_type = resolve_session(event)
         if session_type != "private":
             await qwen3_voice_design.finish("it is not a private session")
         if config.qwen3_tts_voice_design_design == "":
-            await qwen3_voice_design.finish("qwen3_voice_design need 'design' in config")
+            await qwen3_voice_design.finish(
+                "qwen3_voice_design need 'design' in config"
+            )
         text = arg.extract_plain_text().strip()
         if not text:
             await qwen3_voice_design.finish("qwen3_voice_design 需要文本")
@@ -90,8 +98,13 @@ if config.is_enable_qwen3_base:
     async def qwen3_clone_handle(event: Event, bot: Bot, state: T_State):
         session_id, session_type = resolve_session(event)
         if session_type != "private":
-            await send_reply_with_event(bot, event, "it is not a private session",
-                                         session_id=session_id, session_type=session_type)
+            await send_reply_with_event(
+                bot,
+                event,
+                "it is not a private session",
+                session_id=session_id,
+                session_type=session_type,
+            )
             return
         state["user_id"] = get_sender_id(event)
         state["_event"] = event
@@ -118,7 +131,9 @@ if config.is_enable_qwen3_base:
         await qwen3_clone.finish("cancled")
 
     @qwen3_clone.got("qwen3_clone_ref_txt", prompt="参考音频文本")
-    async def qwen3_clone_get_ref_txt(state: T_State, arg: Message = Arg("qwen3_clone_ref_txt")):
+    async def qwen3_clone_get_ref_txt(
+        state: T_State, arg: Message = Arg("qwen3_clone_ref_txt")
+    ):
         _str_ref_txt = arg.extract_plain_text().strip()
         if not _str_ref_txt:
             await qwen3_clone.reject("需要 参考音频文本")
@@ -147,8 +162,13 @@ if config.is_enable_qwen3_base:
     async def qwen3_gen_handle(event: Event, bot: Bot, state: T_State):
         session_id, session_type = resolve_session(event)
         if session_type != "private":
-            await send_reply_with_event(bot, event, "it is not a private session",
-                                         session_id=session_id, session_type=session_type)
+            await send_reply_with_event(
+                bot,
+                event,
+                "it is not a private session",
+                session_id=session_id,
+                session_type=session_type,
+            )
             return
         state["user_id"] = get_sender_id(event)
         state["_event"] = event

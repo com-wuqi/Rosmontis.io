@@ -1,4 +1,5 @@
-from typing import Callable, Dict, Any
+from typing import Dict, Any
+from collections.abc import Callable
 
 from nonebot import get_plugin_config
 from nonebot.plugin import PluginMetadata
@@ -20,7 +21,9 @@ async def hooked_mcp_test():
     return True
 
 
-hooked_functions: Dict[str, Callable] = {"hooked_mcp_test": hooked_mcp_test}  # 工具名称:函数
+hooked_functions: dict[str, Callable] = {
+    "hooked_mcp_test": hooked_mcp_test
+}  # 工具名称:函数
 hooked_tools: list[dict[str, str | dict[str, str | dict[Any, Any] | bool]]] = [{
     "type": "function",
     "function": {

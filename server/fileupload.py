@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 OneBot 文件流上传服务器模拟实现（带 Token 认证）
 支持 upload_file_stream 分片上传，最后合并文件并返回路径
@@ -15,7 +14,6 @@ import shutil
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, Optional, Set
 
 import websockets
 from websockets.http import Headers
@@ -58,12 +56,12 @@ class StreamState:
         self.expected_sha256 = expected_sha256.lower()
         self.filename = filename
         self.file_retention = file_retention  # 保留时间（毫秒），暂未使用
-        self.received_chunks: Set[int] = set()  # 已接收的分片索引
+        self.received_chunks: set[int] = set()  # 已接收的分片索引
         self.temp_dir = TEMP_DIR / stream_id
         self.temp_dir.mkdir(exist_ok=True)
         self.last_active = time.time()
         self.completed = False
-        self.final_path: Optional[Path] = None
+        self.final_path: Path | None = None
 
     def is_complete(self) -> bool:
         """是否已收到所有分片"""
@@ -74,7 +72,7 @@ class StreamState:
         if index in self.received_chunks:
             return False  # 重复分片
         chunk_path = self.temp_dir / f"chunk_{index:06d}.part"
-        with open(chunk_path, "wb") as f:
+        with chunk_path.open("wb") as f:
             f.write(data)
         self.received_chunks.add(index)
         self.last_active = time.time()
@@ -86,12 +84,12 @@ class StreamState:
         final_filename = f"{uuid.uuid4().hex}_{self.filename}"
         final_path = UPLOAD_DIR / final_filename
         hasher = hashlib.sha256()
-        with open(final_path, "wb") as out_f:
+        with final_path.open("wb") as out_f:
             for i in range(self.total_chunks):
                 chunk_path = self.temp_dir / f"chunk_{i:06d}.part"
                 if not chunk_path.exists():
                     raise RuntimeError(f"缺失分片 {i}")
-                with open(chunk_path, "rb") as in_f:
+                with chunk_path.open("rb") as in_f:
                     data = in_f.read()
                     out_f.write(data)
                     hasher.update(data)
@@ -119,9 +117,9 @@ class StreamState:
 class UploadServer:
     def __init__(self, token: str = ""):
         self.token = token
-        self.streams: Dict[str, StreamState] = {}
+        self.streams: dict[str, StreamState] = {}
         self.lock = asyncio.Lock()  # 保护 streams 字典
-        self.cleanup_task: Optional[asyncio.Task] = None
+        self.cleanup_task: asyncio.Task | None = None
 
     async def authenticate(self, headers: Headers) -> bool:
         """
@@ -221,7 +219,10 @@ class UploadServer:
                 if not state.is_complete():
                     return await self.send_error(
                         websocket,
-                        f"分片未收齐，已收 {len(state.received_chunks)}/{state.total_chunks}",
+                        (
+                            f"分片未收齐，已收 {len(state.received_chunks)}/"
+                            f"{state.total_chunks}"
+                        ),
                         echo=echo,
                     )
 
@@ -250,7 +251,7 @@ class UploadServer:
                     if stream_id in self.streams:
                         state.cleanup()
                         del self.streams[stream_id]
-            return
+            return None
 
         # 分片上传请求
         chunk_data_b64 = params.get("chunk_data")

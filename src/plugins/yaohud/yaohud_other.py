@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
 
-from .yaohud_other_handle import whois, today
+from .yaohud_other_handle import today, whois
 
 whois_run = on_command("whois")
 today_run = on_command("today")
@@ -16,7 +16,7 @@ async def whois_run_handle(args: Message = CommandArg()):
     if _res == -1:
         await whois_run.finish("whois error")
     else:
-        await whois_run.finish(f"whois : {str(_res)}")
+        await whois_run.finish(f"whois : {_res!s}")
 
 
 @today_run.handle()

@@ -1,7 +1,7 @@
 import asyncio
+import os
 import time
 import traceback
-import os
 from pathlib import Path
 
 from markitdown import MarkItDown
@@ -16,7 +16,10 @@ import nonebot_plugin_localstore as store
 require("src.plugins.public_apis")
 import src.plugins.public_apis as public_api
 
-_token_bucket = public_api.TokenBucket(rate=config.markitdown_rate_limit, capacity=config.markitdown_rate_limit)
+_token_bucket = public_api.TokenBucket(
+    rate=config.markitdown_rate_limit,
+    capacity=config.markitdown_rate_limit,
+)
 
 # markitdown[docx,pdf,pptx,xls,xlsx]==0.1.6
 
@@ -28,11 +31,7 @@ _MARKITDOWN_SUPPORTED_EXT = {
 
 
 def get_a_md() -> MarkItDown:
-    md = MarkItDown(
-        enable_plugins=None,
-        enable_builtins=None
-    )
-    return md
+    return MarkItDown(enable_plugins=None, enable_builtins=None)
 
 
 def _sync_convert_worker(file_path: str) -> str:
@@ -43,8 +42,9 @@ def _sync_convert_worker(file_path: str) -> str:
 
 async def async_convert(source):
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(public_api.global_progress_pool, _sync_convert_worker, source)
-    return result
+    return await loop.run_in_executor(
+        public_api.global_progress_pool, _sync_convert_worker, source
+    )
 
 
 def is_markitdown_supported_file(s: str) -> bool:

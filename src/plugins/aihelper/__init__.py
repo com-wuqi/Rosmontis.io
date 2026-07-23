@@ -44,7 +44,7 @@ if config.is_enable:
 
     @driver.on_startup
     async def init_infra():
-        """初始化 Redis 和 Stream 消费组。若 bot 先于 Redis 连接则在此处补启动 worker。"""
+        """初始化 Redis 和 Stream 消费组。若 bot 先于 Redis 连接则在此处补启动 worker。"""  # noqa: E501
         global _redis, message_handle_workers, message_handle_loop
 
         _redis = aioredis.from_url(config.redis_url, decode_responses=True)
@@ -57,7 +57,10 @@ if config.is_enable:
                 logger.info(f"Consumer group '{_GROUP}' created for stream '{stream}'")
             except aioredis.ResponseError as e:
                 if "BUSYGROUP" in str(e):
-                    logger.debug(f"Consumer group '{_GROUP}' already exists for stream '{stream}'")
+                    logger.debug(
+                        f"Consumer group '{_GROUP}' "
+                        f"already exists for stream '{stream}'"
+                    )
                 else:
                     raise
 
@@ -65,12 +68,14 @@ if config.is_enable:
             bot = next(iter(_bots.values()))
             message_handle_workers = MessageHandleWorkers(bot, _bots)
             await message_handle_workers.init_workers()
-            message_handle_loop = asyncio.create_task(message_handle_workers.main_loop())
+            message_handle_loop = asyncio.create_task(
+                message_handle_workers.main_loop()
+            )
             logger.info("Workers started from on_startup (bots connected before Redis)")
 
     @driver.on_bot_connect
     async def on_bot(bot: Bot):
-        """注册 bot 实例，首次连接时启动 worker。若 Redis 未就绪则等待 on_startup 补启动。"""
+        """注册 bot 实例，首次连接时启动 worker。若 Redis 未就绪则等待 on_startup 补启动。"""  # noqa: E501
         global _bots, message_handle_workers, message_handle_loop
 
         _bots[get_adapter_name(bot)] = bot

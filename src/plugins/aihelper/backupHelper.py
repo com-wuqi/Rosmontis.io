@@ -37,4 +37,6 @@ async def backup_comments_handle(bot: Bot, event: Event, session: async_scoped_s
 
 @restore_comments.handle()
 async def restore_comments_handle():
-    await backup_comments.finish("请联系数据库维护来还原数据, 这里处于安全考虑不支持自助完成")
+    await backup_comments.finish(
+        "请联系数据库维护来还原数据, 这里处于安全考虑不支持自助完成"
+    )

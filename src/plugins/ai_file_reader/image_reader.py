@@ -7,10 +7,10 @@ import time
 import traceback
 from pathlib import Path
 
-from PIL import Image
 from nonebot import require
 from nonebot.log import logger
 from openai import AsyncOpenAI
+from PIL import Image
 
 from . import config
 
@@ -20,7 +20,10 @@ import nonebot_plugin_localstore as store
 require("src.plugins.public_apis")
 import src.plugins.public_apis as public_api
 
-_token_bucket = public_api.TokenBucket(rate=config.image_ai_rate_limit, capacity=config.image_ai_rate_limit)
+_token_bucket = public_api.TokenBucket(
+    rate=config.image_ai_rate_limit,
+    capacity=config.image_ai_rate_limit,
+)
 
 _IMAGE_SUPPORTED_EXT = {
     ".png", ".jpg", ".jpeg",
@@ -64,24 +67,24 @@ def compress_image(
     if not ext:
         ext = os.path.splitext(input_path)[1].lower()
         output_path += ext  # 根据input推断
-    if ext in ('.jpg', '.jpeg'):
-        img = img.convert('RGB')  # JPEG 不能有透明通道
-        img.save(output_path, format='JPEG', quality=quality, optimize=True)
-    elif ext == '.png':
+    if ext in (".jpg", ".jpeg"):
+        img = img.convert("RGB")  # JPEG 不能有透明通道
+        img.save(output_path, format="JPEG", quality=quality, optimize=True)
+    elif ext == ".png":
         # PNG 压缩：optimize 会尝试更好的编码，也可用 quantize 减少颜色
-        if not lossless and img.mode in ('RGBA', 'RGB'):
+        if not lossless and img.mode in ("RGBA", "RGB"):
             # 将有透明通道的图片减少颜色至 256 色（仍保留透明）
             img = img.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
             # quantize 后模式变为 P，如有透明需保存 transparency 信息
-            img.save(output_path, format='PNG', optimize=True)
+            img.save(output_path, format="PNG", optimize=True)
         else:
-            img.save(output_path, format='PNG', optimize=True)
-    elif ext == '.webp':
-        img.save(output_path, format='WEBP', quality=quality, lossless=lossless)
-    elif ext == '.gif':
+            img.save(output_path, format="PNG", optimize=True)
+    elif ext == ".webp":
+        img.save(output_path, format="WEBP", quality=quality, lossless=lossless)
+    elif ext == ".gif":
         # GIF 不支持 quality 参数；尽量减小调色板
-        img = img.convert('P', palette=Image.Palette.ADAPTIVE)
-        img.save(output_path, format='GIF', optimize=True)
+        img = img.convert("P", palette=Image.Palette.ADAPTIVE)
+        img.save(output_path, format="GIF", optimize=True)
     else:
         # 其他格式用默认保存
         img.save(output_path, optimize=True)
@@ -90,33 +93,36 @@ def compress_image(
     original_size = os.path.getsize(input_path)
     compressed_size = os.path.getsize(output_path)
     logger.debug(f"compress_image path: {input_path} -> {output_path}")
-    logger.debug(f"compress_image success：{original_size // 1024}KB -> {compressed_size // 1024}KB ")
+    logger.debug(
+        f"compress_image success："
+        f"{original_size // 1024}KB -> {compressed_size // 1024}KB "
+    )
 
 
 def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
+    with Path(image_path).open("rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
 async def encode_image_async(image_path):
     loop = asyncio.get_event_loop()
     func = functools.partial(encode_image, image_path)
-    result = await loop.run_in_executor(public_api.global_progress_pool, func)
-    return result
+    return await loop.run_in_executor(public_api.global_progress_pool, func)
 
 
 async def compress_image_async(input_path, output_path, **kwargs):
     loop = asyncio.get_running_loop()
     func = functools.partial(compress_image, input_path, output_path, **kwargs)
-    result = await loop.run_in_executor(public_api.global_progress_pool, func)
-    return result
+    return await loop.run_in_executor(public_api.global_progress_pool, func)
 
 
 async def read_image(file_name: str, file_url: str) -> str | None:
     """下载（或读取本地 file://）图片 → 压缩 → AI 视觉识别 → 返回文本描述。"""
     await _token_bucket.acquire()
     image_path = store.get_plugin_cache_file(f"{time.time()}-{file_name}")
-    compressed_image_path = store.get_plugin_cache_file(f"compressed-{time.time()}-{file_name}")
+    compressed_image_path = store.get_plugin_cache_file(
+        f"compressed-{time.time()}-{file_name}"
+    )
     _return = None
     mime_type, _ = mimetypes.guess_type(file_name)
     try:
@@ -132,30 +138,49 @@ async def read_image(file_name: str, file_url: str) -> str | None:
             _try_download = await public_api.download_file(file_url, str(image_path))
             if _try_download != 0:
                 raise RuntimeError("download failed")
-        await asyncio.gather(compress_image_async(input_path=str(image_path), output_path=str(compressed_image_path)))
+        await asyncio.gather(
+            compress_image_async(
+                input_path=str(image_path),
+                output_path=str(compressed_image_path),
+            )
+        )
         if not os.path.exists(str(compressed_image_path)):
             raise RuntimeError("compress image failed")
         base64_image = await encode_image_async(str(compressed_image_path))
-        client = AsyncOpenAI(base_url=config.image_ai_api_url, api_key=config.image_ai_api_key,
-                             timeout=config.image_ai_api_timeout)
+        client = AsyncOpenAI(
+            base_url=config.image_ai_api_url,
+            api_key=config.image_ai_api_key,
+            timeout=config.image_ai_api_timeout,
+        )
         chat_completion = await client.chat.completions.create(
             model=config.image_ai_model_name,
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "请准确，详细，客观的描述图片里的所有内容"},
-                        {"type": "text", "text": "要求：直接输出最终描述结果，不要输出任何思考过程或解释。"},
-                        {"type": "text", "text": "输出格式：纯文本，无需分段标题。"},
+                        {
+                            "type": "text",
+                            "text": "请准确，详细，客观的描述图片里的所有内容",
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "要求：直接输出最终描述结果，"
+                                "不要输出任何思考过程或解释。"
+                            ),
+                        },
+                        {
+                            "type": "text",
+                            "text": "输出格式：纯文本，无需分段标题。",
+                        },
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:{mime_type};base64,{base64_image}",
-                                "detail": "auto"
-                            }
-                        }
-                    ]
-
+                                "detail": "auto",
+                            },
+                        },
+                    ],
                 }
             ],
             temperature=1.0,
@@ -173,8 +198,10 @@ async def read_image(file_name: str, file_url: str) -> str | None:
         if not _return or not _return.content:
             logger.warning(
                 f"返回空内容，"
-                f"finish_reason: {getattr(chat_completion.choices[0], 'finish_reason', 'unknown')} | "
-                f"完整响应: {chat_completion.model_dump()}")
+                f"finish_reason: "
+                f"{getattr(chat_completion.choices[0], 'finish_reason', 'unknown')} | "
+                f"完整响应: {chat_completion.model_dump()}"
+            )
             raise RuntimeError("模型未返回有效描述内容")
         _msg = _return.content
         logger.debug(f"read_image: {_msg}")

@@ -30,9 +30,15 @@ from src.plugins.public_apis.shared_funcs import download_file
 # ============================================================
 
 
-async def save_bytes_to_cache(file_data: bytes, prefix: str, file_name: str = "") -> str:
+async def save_bytes_to_cache(
+    file_data: bytes, prefix: str, file_name: str = ""
+) -> str:
     """把 bytes 异步写入 localstore 缓存目录，返回文件路径字符串。"""
-    name = f"{prefix}_{time.time()}_{file_name}" if file_name else f"{prefix}_{time.time()}"
+    name = (
+        f"{prefix}_{time.time()}_{file_name}"
+        if file_name
+        else f"{prefix}_{time.time()}"
+    )
     tmp_path = store.get_plugin_cache_file(name)
     async with aiofiles.open(tmp_path, "wb") as f:
         await f.write(file_data)
@@ -42,7 +48,11 @@ async def save_bytes_to_cache(file_data: bytes, prefix: str, file_name: str = ""
 def get_event_bot(event: Event) -> Bot | None:
     """根据事件所属的 adapter，从全局 bot 注册表查找正确的 bot 实例。"""
     from src.plugins.aihelper import _bots
-    adapter = "onebot" if is_onebot_event(event) else ("feishu" if is_feishu_event(event) else "")
+    adapter = (
+        "onebot"
+        if is_onebot_event(event)
+        else ("feishu" if is_feishu_event(event) else "")
+    )
     bot = _bots.get(adapter)
     if bot is None:
         logger.warning(f"get_event_bot: adapter={adapter} not connected yet")
@@ -70,7 +80,7 @@ def is_feishu_event(event: Event) -> bool:
 def get_adapter_name(bot: Bot) -> str:
     """
     获取统一适配器名：'onebot' | 'feishu' | 'unknown'
-    
+
     基于 bot.type（注册 adapter 时填的 name，如 'OneBot V11' 或 '飞书'）。
     """
     name = getattr(bot, "type", "")
@@ -97,7 +107,7 @@ def is_feishu(bot: Bot) -> bool:
 def resolve_session(event: Event) -> tuple[str, str]:
     """
     从事件解析出 (session_id: str, session_type: str)。
-    
+
     session_type 返回 "group"（群聊）或 "private"（私聊），不再是旧代码中的
     "GroupMessageEvent" / "PrivateMessageEvent" 字符串。
 
@@ -140,7 +150,7 @@ def get_sender_id(event: Event) -> str:
 
     OneBot → str(event.user_id)      如 "2133685523"
     Feishu → event.get_user_id()      如 "ou_xxxxxxxx"
-    
+
     用于 AI 对话中拼接 "user: {sender_id}: {msg}" 的消息前缀，
     替代旧代码中的 event.user_id（OneBot 下是 int）。
     """
@@ -239,7 +249,9 @@ def get_attachment_segments(event: Event) -> list[dict]:
             entry["file_url"] = seg.data.get("url")
             entry["file_key"] = None
             from nonebot.adapters.onebot.v11 import GroupMessageEvent
-            entry["session_type"] = "group" if isinstance(event, GroupMessageEvent) else "private"
+            entry["session_type"] = (
+                "group" if isinstance(event, GroupMessageEvent) else "private"
+            )
         elif is_feishu_event(event):
             key = seg.data.get("file_key") or seg.data.get("image_key")
             entry["file_key"] = key
@@ -280,7 +292,11 @@ async def download_to_cache(bot: Bot, attachment: dict) -> str | None:
         return str(tmp_path) if code == 0 else None
 
     if file_id and is_onebot(bot):
-        api_name = "get_group_file_url" if attachment.get("session_type") == "group" else "get_private_file_url"
+        api_name = (
+            "get_group_file_url"
+            if attachment.get("session_type") == "group"
+            else "get_private_file_url"
+        )
         info = await bot.call_api(api_name, file_id=file_id)
         tmp_path = store.get_plugin_cache_file(f"dl_{file_name}")
         code = await download_file(info["url"], str(tmp_path))
@@ -320,7 +336,9 @@ async def download_attachment(bot: Bot, attachment: dict) -> tuple[str, bytes] |
             pass
 
 
-async def upload_file_to_platform(bot: Bot, file_path: str, file_name: str = "") -> str | None:
+async def upload_file_to_platform(
+    bot: Bot, file_path: str, file_name: str = ""
+) -> str | None:
     """上传本地文件到平台，返回平台标识符。上传后自动 unlink 源文件。"""
     if not file_name:
         file_name = os.path.basename(file_path)
@@ -408,8 +426,11 @@ async def send_reply_with_event(bot: Bot, event: Event, content,
     await send_reply(bot, session_id, session_type, content)
 
 
-async def build_file_message(bot: Bot, file_ref: str, file_name: str = "") -> MessageSegment:
-    """构造文件消息段。file_ref 为本地路径或 HTTP URL。内部委托 upload_file_to_platform。"""
+async def build_file_message(
+    bot: Bot, file_ref: str, file_name: str = ""
+) -> MessageSegment:
+    """构造文件消息段。file_ref 为本地路径或 HTTP URL。
+    内部委托 upload_file_to_platform。"""
     if not file_name:
         file_name = os.path.basename(file_ref)
     if file_ref.startswith(("http://", "https://")):

@@ -15,7 +15,12 @@ apple_music = on_command("applemu")
 @qq_music.handle()
 @kuwo_music.handle()
 @apple_music.handle()
-async def common_music_handle(event: Event, bot: Bot, cmd: tuple[str, ...] = Command(), args: Message = CommandArg()):
+async def common_music_handle(
+    event: Event,
+    bot: Bot,
+    cmd: tuple[str, ...] = Command(),
+    args: Message = CommandArg(),
+):
     cmd_name = cmd[0]
     if cmd_name == "163mu":
         api_type = "wyvip"
@@ -33,7 +38,9 @@ async def common_music_handle(event: Event, bot: Bot, cmd: tuple[str, ...] = Com
         await send_reply_with_event(bot, event, f"参数个数不正确 : {len(args_list)}")
         return
     if len(args_list) == 1:
-        _res = await get_common_music(api_type=api_type, msg_type="search", msg=args_list[0])
+        _res = await get_common_music(
+            api_type=api_type, msg_type="search", msg=args_list[0]
+        )
         if _res == -1:
             await send_reply_with_event(bot, event, "failed")
             return
@@ -45,7 +52,12 @@ async def common_music_handle(event: Event, bot: Bot, cmd: tuple[str, ...] = Com
         if not args_list[1].isdigit():
             await send_reply_with_event(bot, event, "参数不合法, 第二个参数需要是数字")
             return
-        _res = await get_common_music(api_type=api_type, msg_type="get", msg=args_list[0], n=int(args_list[1]))
+        _res = await get_common_music(
+            api_type=api_type,
+            msg_type="get",
+            msg=args_list[0],
+            n=int(args_list[1]),
+        )
         if _res == -1:
             await send_reply_with_event(bot, event, "failed")
             return

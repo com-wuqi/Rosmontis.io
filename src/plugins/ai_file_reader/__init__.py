@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from types import CoroutineType
-from typing import Callable, Any
+from typing import Any
 
 from nonebot import get_plugin_config
 from nonebot.adapters import Bot, Event
@@ -7,8 +8,8 @@ from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 from pydantic import BaseModel
 
+from ..shared.adapter_utils import download_to_cache, get_attachment_segments
 from .config import Config
-from ..shared.adapter_utils import get_attachment_segments, download_to_cache
 
 __plugin_meta__ = PluginMetadata(
     name="ai_file_reader",
@@ -48,7 +49,10 @@ filereader_config: list[FileReaderConfig] = [
 
 
 async def get_file_from_event(event: Event, bot: Bot) -> tuple[int, str]:
-    """从事件中提取附件，匹配阅读器解析后返回 (文件数, 文本内容)。支持 segment_type + 扩展名双重匹配。"""
+    """从事件中提取附件，匹配阅读器解析后返回 (文件数, 文本内容)。
+
+    支持 segment_type + 扩展名双重匹配。
+    """
     if not config.is_enable:
         return 0, ""
 
@@ -64,9 +68,13 @@ async def get_file_from_event(event: Event, bot: Bot) -> tuple[int, str]:
         att_type = att.get("type", "")
 
         matched_reader = next(
-            (r for r in reader_configs
-             if r.matcher(file_name) or (r.segment_type and r.segment_type == att_type)),
-            None
+            (
+                r
+                for r in reader_configs
+                if r.matcher(file_name)
+                or (r.segment_type and r.segment_type == att_type)
+            ),
+            None,
         )
         if matched_reader is None:
             continue

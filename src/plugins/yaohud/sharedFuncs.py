@@ -3,7 +3,7 @@ import asyncio
 from nonebot import require
 
 require("src.plugins.public_apis")
-import src.plugins.public_apis as public_apis
+from src.plugins import public_apis
 
 semaphore_download = asyncio.Semaphore(20)
 

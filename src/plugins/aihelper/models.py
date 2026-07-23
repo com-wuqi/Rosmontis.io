@@ -24,7 +24,9 @@ class Settings(Model):
 class AIHelperComments(Model):
     __tablename__ = "aihelper_comments"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    comment_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, unique=True)
+    comment_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True, unique=True
+    )
     message: Mapped[str] = mapped_column(Text)
 
 
