@@ -21,13 +21,11 @@ def generate_signature(timestamp: int) -> str:
     sign_string = f"key={api_key}&timestamp={timestamp}"
 
     # 使用 Secret Key 计算 HMAC-SHA256
-    signature = hmac.new(
-        key=secret_key.encode('utf-8'),
-        msg=sign_string.encode('utf-8'),
+    return hmac.new(
+        key=secret_key.encode("utf-8"),
+        msg=sign_string.encode("utf-8"),
         digestmod=hashlib.sha256
     ).hexdigest()
-
-    return signature
 
 
 def build_headers(timestamp: int | None = None) -> dict:
@@ -42,11 +40,10 @@ def build_headers(timestamp: int | None = None) -> dict:
 
     signature = generate_signature(timestamp)
 
-    headers = {
+    return {
         "X-Api-Key": api_key,
         "X-Api-Timestamp": str(timestamp),
         "X-Api-Sign": signature,
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
-    return headers

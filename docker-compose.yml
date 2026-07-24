@@ -1,7 +1,4 @@
 # Rosmontis.io Docker Compose 配置
-version: '3.8'
-
-
 services:
   # 机器人服务
   rosbot:
@@ -14,9 +11,10 @@ services:
     environment:
       # 从 .env.prod 加载，这里可以覆盖
       - SQLALCHEMY_DATABASE_URL=mysql+aiomysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data
-      - ONEBOT_WS_URLS=["ws://napcat:3001/onebot/v11/ws"]
-      - PUBLICAPI__UPLOAD_WS_URL=ws://napcat:3001
-      - QZONE_API__WS_URL=ws://napcat:3001
+      - ONEBOT_WS_URLS=["ws://snowluma:3001/"]
+      - PUBLICAPI__UPLOAD_WS_URL=ws://snowluma:3001
+      - PUBLICAPI__IS_ENABLE_UPLOAD=true
+      - AIHELPER__REDIS_URL=redis://redis:6379/0
       - APSCHEDULER_CONFIG={"apscheduler.jobstores":{"default":{"type":"sqlalchemy","url":"mysql+pymysql://rosbot:${MYSQL_PASSWORD}@mysql:3306/data","tablename":"apscheduler_jobs"}}}
 
     volumes:
@@ -29,6 +27,10 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      snowluma:
+        condition: service_started
     networks:
       - rosbot-network
 
@@ -57,27 +59,55 @@ services:
       retries: 5
       start_period: 30s
 
-  napcat:
-    image: mlikiowa/napcat-docker:latest
-    container_name: napcat
+  # Redis
+  redis:
+    image: redis:8-alpine
+    container_name: rosbot-redis
     restart: unless-stopped
-    environment:
-      # 容器内运行的用户 ID，通常保持 0（root）避免权限问题
-      - NAPCAT_UID=${NAPCAT_UID:-0}
-      - NAPCAT_GID=${NAPCAT_GID:-0}
-      # 机器人的 QQ 账号
-      - ACCOUNT=${DOCKER_QQ_ACCOUNT:-1}
-      # 可选：设置 WebUI 的访问令牌，如果不设置，系统会随机生成一个并在日志中打印
-      - WEBUI_TOKEN=${NAPWEBUI_TOKEN:-}
-    ports:
-      # NapCat 管理面板端口 (WebUI)，通过此端口扫码登录和配置
-      - "6099:6099"
-      # 正向 WebSocket 服务端口，映射到宿主机便于调试（可选，rosbot 通过内部网络访问不需要映射）
-      - "3001:3001"
+    command: redis-server --appendonly yes --save 900 1 --save 300 10
     volumes:
-      - ./napcat_config:/app/napcat/config
-      - ./napcat_qq_data:/app/.config/QQ
-      - ./napcat_logs:/app/napcat/logs
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - rosbot-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  snowluma:
+    image: ${SNOWLUMA_IMAGE:-motricseven7/snowluma:latest}
+    container_name: snowluma
+    restart: unless-stopped
+    shm_size: 1gb
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    environment:
+      SNOWLUMA_ACCEPT_EULA: 1
+      SNOWLUMA_ACCEPT_PRIVACY: 1
+      VNC_PASSWD: ${VNC_PASSWD:-vncpasswd}
+      SNOWLUMA_UID: ${SNOWLUMA_UID:-1000}
+      SNOWLUMA_GID: ${SNOWLUMA_GID:-1000}
+      SNOWLUMA_WEBUI_PORT: ${SNOWLUMA_WEBUI_PORT:-5099}
+      SNOWLUMA_LOG_LEVEL: ${SNOWLUMA_LOG_LEVEL:-info}
+      SNOWLUMA_SCREEN: ${SNOWLUMA_SCREEN:-1920x1080x24}
+      SNOWLUMA_HOOK_AUTOLOAD: ${SNOWLUMA_HOOK_AUTOLOAD:-1}
+      SNOWLUMA_EXTRA_QQ_HOMES: "${SNOWLUMA_EXTRA_QQ_HOMES:-}"
+      SNOWLUMA_QQ_FLAGS: "${SNOWLUMA_QQ_FLAGS:---disable-gpu --disable-software-rasterizer --disable-gpu-compositing}"
+    ports:
+      - "${VNC_PORT:-5900}:5900"
+      - "${NOVNC_PORT:-6081}:6081"
+      - "${SNOWLUMA_WEBUI_HOST_PORT:-5099}:${SNOWLUMA_WEBUI_PORT:-5099}"
+      - "${ONEBOT_HTTP_PORT:-3000}:3000"
+      - "${ONEBOT_WS_PORT:-3001}:3001"
+    volumes:
+      - snowluma-data:/app/snowluma-data
+      - snowluma-qq-config:/app/.config
+      - snowluma-qq-data:/app/.local/share
     networks:
       - rosbot-network
 
@@ -90,3 +120,8 @@ volumes:
     driver: local
   mysql_data:
     driver: local
+  redis_data:
+    driver: local
+  snowluma-data:
+  snowluma-qq-config:
+  snowluma-qq-data:

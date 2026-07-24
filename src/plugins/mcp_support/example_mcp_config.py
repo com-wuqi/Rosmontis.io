@@ -27,12 +27,14 @@ class McpServerConfig:
 # 以下是配置项
 # 工作目录可以自定义, 但是注意需要自行创建
 mcp_init_timeout = 180  # 初始化时间限制 (加载工具列表前)
+mcp_shutdown_timeout = 180  # 关闭时间限制
 mcp_configs = [
     # McpServerConfig(
     #     name="filesystem",
     #     transport="stdio",
     #     command="npx",
-    #     args=["-y", "@modelcontextprotocol/server-filesystem", f"{os.path.abspath("mcp_workdir/fs")}"],
+    #     args=["-y", "@modelcontextprotocol/server-filesystem",
+    #           f"{os.path.abspath("mcp_workdir/fs")}"],
     #     prefix="fs",
     # ),
     # McpServerConfig(
@@ -57,6 +59,7 @@ mcp_configs = [
             # 时间, 网络搜索, e2b代码沙箱的开关
             "WEBSEARCH_BASE_URL": "https://api.bocha.cn/v1/web-search",
             # 网页搜索 api ,不支持修改, https://open.bochaai.com/ 注册
+            # firecrawl 也包含相关能力
             "WEBSEARCH_TIMEOUT": "90",
             # 单次搜索超时
             "WEBSEARCH_API_KEY": "sk-",
@@ -70,11 +73,66 @@ mcp_configs = [
             "KNOWLEDGE_API_TOKEN": "",
             "KNOWLEDGE_API_MODEL_NAME": "",  # 模型名称
             "KNOWLEDGE_API_TIMEOUT": "300",  # api 接口超时
-            "KNOWLEDGE_DB_DIR": "./test_knowledge.db"  # 需要提供，默认当前，向量数据库的位置
+            "KNOWLEDGE_DB_DIR": "./test_knowledge.db"
+            # 需要提供，默认当前，向量数据库的位置
 
         },
         prefix="ros",
     ),
+    # McpServerConfig(
+    #     name="luckin-coffee",
+    #     transport="streamable-http",
+    #     url="https://gwmcp.lkcoffee.com/order/user/mcp",
+    #     prefix="lkcoffee",
+    #     headers={
+    #         "Authorization": "Bearer <your token here>"
+    #     }
+    # )
+    # McpServerConfig(
+    #     name="Macdonald-mcp",
+    #     transport="streamable-http",
+    #     url="https://mcp.mcd.cn",
+    #     prefix="Macdonald",
+    #     headers={
+    #         "Authorization": "Bearer <your token here>"
+    #     }
+    # )
+    # McpServerConfig(
+    #     name="firecrawl",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "firecrawl-mcp"],
+    #     env={
+    #         "FIRECRAWL_API_KEY": "<your token here>"
+    #     },
+    #     prefix="firecrawl"
+    # ),
+    # McpServerConfig(
+    #     name="github-mcp",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-github"],
+    #     env={
+    #         "GITHUB_PERSONAL_ACCESS_TOKEN": "<your token here>"
+    #     },
+    #     prefix="github"
+    # ),
+    # McpServerConfig(
+    #     # 除非你明白你在配置什么，否则请不要使用
+    #     # 详细配置文档
+    #     name="snowluma",
+    #     transport="stdio",
+    #     command="npx",
+    #     args=["-y", "@snowluma/mcp"],
+    #     env={
+    #         "SNOWLUMA_MCP_ENDPOINT": "http://127.0.0.1:3000/",
+    #         "SNOWLUMA_MCP_TOKEN": "<your token here>",
+    #         # "SNOWLUMA_MCP_MODE": "write"
+    #         # 写模式会把 invoke_action 暴露给 MCP 客户端。
+    #         # 只有在你信任当前客户端、模型和会话时才开启。
+    #     },
+    #     prefix="snowluma"
+    # ),
 ]
 """
 其他例子

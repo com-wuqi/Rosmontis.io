@@ -1,8 +1,12 @@
+import asyncio
+
 from nonebot import get_driver, on_command
 from nonebot import get_plugin_config
+from nonebot.adapters import Event
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
+from src.plugins.shared.adapter_utils import get_sender_id, resolve_session
 
 __plugin_meta__ = PluginMetadata(
     name="mcp_support",
@@ -17,26 +21,29 @@ driver = get_driver()
 
 from .MultiMCPManager import MultiMCPManager
 
-if config.is_enable:
-    mcp_manger = MultiMCPManager()
-else:
-    mcp_manger = None
-
+mcp_manger = MultiMCPManager() if config.is_enable else None
+mcp_manger_lock = asyncio.Lock()
 
 @driver.on_startup
 async def _init_mcp_support():
-    if config.is_enable:
-        await mcp_manger.connect_all()
+    if mcp_manger is not None:
+        async with mcp_manger_lock:
+            await mcp_manger.connect_all()
 
 
 @driver.on_shutdown
 async def _shutdown_mcp_support():
-    if config.is_enable:
-        await mcp_manger.close_all()
+    if mcp_manger is not None:
+        try:
+            async with mcp_manger_lock:
+                await mcp_manger.close_all()
+        except asyncio.CancelledError:
+            pass
 
 
-mcp_status = on_command("mcp_status")
-
+_superusers = set(get_driver().config.superusers)
+mcp_status = on_command("mcp-status")
+mcp_reload = on_command("mcp-reload")  # 需要特权
 
 @mcp_status.handle()
 async def mcp_status_handle():
@@ -44,3 +51,21 @@ async def mcp_status_handle():
         await mcp_status.finish(f"{mcp_manger.get_status()}")
     else:
         await mcp_status.finish("mcp is disabled")
+
+
+@mcp_reload.handle()
+async def mcp_reload_handle(event: Event):
+    sender = get_sender_id(event)
+    _, session_type = resolve_session(event)
+    if sender not in _superusers or session_type != "private":
+        await mcp_reload.finish("Permission denied")
+        return
+    if mcp_manger is None:
+        await mcp_reload.finish("mcp is disabled")
+        return
+    async with mcp_manger_lock:
+        await mcp_reload.send("mcp is closing")
+        await mcp_manger.close_all()
+        await mcp_reload.send("mcp is starting")
+        await mcp_manger.connect_all()
+        await mcp_reload.finish("mcp is reloaded")

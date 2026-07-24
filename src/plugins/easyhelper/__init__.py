@@ -1,6 +1,6 @@
 from nonebot import get_plugin_config
-from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Message
+from nonebot import on_command,get_driver
+from nonebot.adapters import Message
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 
@@ -16,12 +16,13 @@ __plugin_meta__ = PluginMetadata(
 config = get_plugin_config(Config)
 
 request_help = on_command("get-help")
-
+_command_start = get_driver().config.command_start
 
 @request_help.handle()
 async def request_help_handle(args: Message = CommandArg()):
     # 帮助
-    _string = """
+    _string = f"""
+    ！命令需要包含以下符号之一才会被调用：{_command_start}
     用法 get-help [类型]
     类型包含:
     ai-talk : AI 对话相关
@@ -67,11 +68,10 @@ async def request_help_handle(args: Message = CommandArg()):
     applemu [搜索名] [id | null] -- 下载音乐(apple音乐)
     """,
         "other": """
-    yiyan -- 输出一条一言(不是遗言)
     whois [url] -- 查询 whois 信息
     today -- 历史上的今天
-    mcp_status -- MCP 服务状态
-    qzone txt [文本1] [文本2]... --- (不同文本换行)发动态,需要 SUPERUSERS
+    mcp-status -- MCP 服务状态
+    mcp-reload -- MCP 手动重载，需要管理员
     """
     }
     if args.extract_plain_text() is None or len(args.extract_plain_text().strip()) == 0:

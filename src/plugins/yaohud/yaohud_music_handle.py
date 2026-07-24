@@ -8,7 +8,7 @@ from nonebot import require
 from nonebot.log import logger
 
 from . import config
-from .sharedFuncs import TokenBucket, download_file, upload_file
+from .sharedFuncs import TokenBucket, download_file
 from .signHelper import build_headers
 
 require("nonebot_plugin_localstore")
@@ -21,16 +21,30 @@ _bucket_apple_music = TokenBucket(rate=15 / 20, capacity=15)
 
 _semaphore_music = asyncio.Semaphore(30)
 _file_extension: dict = {
-    "wyvip": {"standard": "mp3", "exhigh": "mp3", "lossless": "flac", "jyeffect": "flac", "sky": "flac",
-              "jymaster": "flac"},
+    "wyvip": {
+        "standard": "mp3",
+        "exhigh": "mp3",
+        "lossless": "flac",
+        "jyeffect": "flac",
+        "sky": "flac",
+        "jymaster": "flac",
+    },
     "qq_plus": {"mp3": "mp3", "hq": "mp3", "flac": "flac"},
-    "kuwo": {"Standard": "mp3", "exhigh": "mp3", "SQ": "mp3", "lossless": "flac", "hires": "flac"}
+    "kuwo": {
+        "Standard": "mp3",
+        "exhigh": "mp3",
+        "SQ": "mp3",
+        "lossless": "flac",
+        "hires": "flac",
+    },
 }
 
 
 # 缺少测试, 仅仅作为简单映射, 和上游以及音源相关
 
-async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g: int = 15):
+async def get_common_music(
+    api_type: str, msg_type: str, msg: str, n: int = 1, g: int = 15
+):
     """
         通用音乐接口
     :param api_type: 接口类型, 支持 "wyvip" "qq_plus" "kuwo" "applemu"
@@ -84,30 +98,39 @@ async def get_common_music(api_type: str, msg_type: str, msg: str, n: int = 1, g
 
                 if api_type == "wyvip":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
-                    _file_name = f"wyvip-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.wyvip_level]}"
+                    _file_name = (
+                        f"wyvip-{data_json['data']['name']}-{time.time()}."
+                        f"{_file_extension[api_type][config.wyvip_level]}"
+                    )
                     _music = store.get_plugin_cache_file(_file_name)
                 elif api_type == "qq_plus":
                     music_url: str = data_json["data"]["music_url"]["url"]
-                    _file_name = f"qq_plus-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.qqmusic_level]}"
+                    _file_name = (
+                        f"qq_plus-{data_json['data']['name']}-{time.time()}."
+                        f"{_file_extension[api_type][config.qqmusic_level]}"
+                    )
                     _music = store.get_plugin_cache_file(_file_name)
                 elif api_type == "kuwo":
                     music_url: str = data_json["data"]["vipmusic"]["url"]
-                    _file_name = f"kuwo-{data_json["data"]["name"]}-{time.time()}.{_file_extension[api_type][config.kuwo_size]}"
+                    _file_name = (
+                        f"kuwo-{data_json['data']['name']}-{time.time()}."
+                        f"{_file_extension[api_type][config.kuwo_size]}"
+                    )
                     _music = store.get_plugin_cache_file(_file_name)
                 elif api_type == "applemu":
                     music_url: str = data_json["data"]["url"]
-                    _file_name = f"apple_music-{data_json["data"]["trackName"]}-{time.time()}.ogg"
+                    _file_name = (
+                        f"apple_music-"
+                        f"{data_json['data']['trackName']}-{time.time()}.ogg"
+                    )
                     _music = store.get_plugin_cache_file(_file_name)
 
                 logger.debug(f"music url: {music_url}")
 
                 _res = await download_file(url=music_url, save_path=str(_music))
                 if _res == 0:
-                    _remote_path = await upload_file(path=str(_music))
-                    _music.unlink()  # 删除文件
-                    return _remote_path  # 返回远程地址
-                else:
-                    return -1
+                    return str(_music)
+                return -1
             except HTTPStatusError as e:
                 logger.warning(f"get_common_music failed with {e}")
                 return -1

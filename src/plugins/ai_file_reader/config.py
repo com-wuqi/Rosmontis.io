@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class ScopedConfig(BaseModel):
     """Plugin Config Here"""
     is_enable: bool = True
+
     is_enable_image: bool = False
     image_ai_api_url: str = ""
     image_ai_api_key: str = ""
@@ -15,6 +16,9 @@ class ScopedConfig(BaseModel):
     # 等比缩放，使用一个参数即可
     image_zip_max_width: int | None = None  # 等比缩放，最大宽度
     image_zip_max_height: int | None = None  # 等比缩放，最大高度
+
+    is_enable_markitdown: bool = False  # 是否使用 microsoft/markitdown
+    markitdown_rate_limit: int = 10  # 每分钟可以转换的文件数量
 
 
 class Config(BaseModel):

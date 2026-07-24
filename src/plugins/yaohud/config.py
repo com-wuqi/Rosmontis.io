@@ -10,7 +10,8 @@ class ScopedConfig(BaseModel):
     api_secret: str = ""
     wyvip_cookie: str = ""  # 暂时不使用
     wyvip_level: str = ""
-    # standard：标准音质 | exhigh：极高音质 |lossless 无损音质 | hires Hi-Res音质 | jyeffect 高清环绕声 | sky：沉浸环绕声 | jymaster：超清母带
+    # standard：标准音质 | exhigh：极高音质 |lossless 无损音质 | hires Hi-Res音质
+    # | jyeffect 高清环绕声 | sky：沉浸环绕声 | jymaster：超清母带
     qqmusic_cookie: str = ""  # 暂时不使用
     qqmusic_level: str = ""
     # mp3 : 普通音质、hq : 高品质、flac : 无损

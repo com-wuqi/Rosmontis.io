@@ -1,14 +1,26 @@
 import asyncio
 import time
-from typing import Callable
-from typing import List, Dict
+from collections.abc import Callable
 
 import aiofiles
 from nonebot.log import logger
-from openai import AsyncOpenAI, RateLimitError, APIConnectionError, AuthenticationError, APITimeoutError, APIStatusError
+from openai import (
+    AsyncOpenAI,
+    RateLimitError,
+    APIConnectionError,
+    AuthenticationError,
+    APITimeoutError,
+    APIStatusError,
+)
 from openai.types.chat import ChatCompletionMessage
 from sqlalchemy import select
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryCallState
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    RetryCallState,
+)
 
 from . import config
 from .models import *
@@ -28,14 +40,11 @@ require("src.plugins.public_apis")
 import src.plugins.public_apis as public_api
 
 require("src.plugins.hooked_mcp_tools")
-import src.plugins.hooked_mcp_tools as hooked_mcp_tools
+from src.plugins import hooked_mcp_tools
 
 require("src.plugins.ai_file_reader")
-import src.plugins.ai_file_reader as ai_file
 
-ai_file_reader = ai_file.ai_file_reader
-
-checked_hooked_mcp_tools: Dict[str, Callable] = {}
+checked_hooked_mcp_tools: dict[str, Callable] = {}
 for _key in hooked_mcp_tools.hooked_functions.keys():
     _func = hooked_mcp_tools.hooked_functions[_key]
     if callable(_func):
@@ -60,7 +69,7 @@ def _on_before(retry_state: RetryCallState):
         # 这里可以引入 circuit breaker，从外部获取是否允许重试
     else:
         logger.debug(
-            f"send_messages_to_ai | "
+            "send_messages_to_ai | "
             "first call, no retry"
         )
 
@@ -68,8 +77,13 @@ def _on_before(retry_state: RetryCallState):
 def _on_after(retry_state: RetryCallState):
     """调用结束后记录"""
     exc = retry_state.outcome.exception()
-    retry_after = getattr(getattr(exc, "headers", None), "get", lambda k, d="N/A": d)("retry-after", "N/A")
-    will_retry = retry_state.next_action is not None and retry_state.next_action.sleep > 0
+    _headers = getattr(exc, "headers", None)
+    _getter = getattr(_headers, "get", lambda k, d="N/A": d)
+    retry_after = _getter("retry-after", "N/A")
+    will_retry = (
+        retry_state.next_action is not None
+        and retry_state.next_action.sleep > 0
+    )
 
     if will_retry:
         logger.warning(
@@ -79,18 +93,19 @@ def _on_after(retry_state: RetryCallState):
         )
     else:
         logger.error(
-            f"send_messages_to_ai 达到最大重试次数，调用失败 | attempts={retry_state.attempt_number} | {type(exc).__name__}: {exc}")
+            f"send_messages_to_ai 达到最大重试次数，调用失败 | "
+            f"attempts={retry_state.attempt_number} | "
+            f"{type(exc).__name__}: {exc}")
 
 
-async def get_model_names(key:str,url:str) -> List[str]:
+async def get_model_names(key:str,url:str) -> list[str]:
     async with semaphore:
         client = AsyncOpenAI(base_url=url,api_key=key,timeout=10)
         try:
             # 异步调用模型列表接口
             response = await client.models.list()
             # 提取模型 ID 列表
-            model_names = [model.id for model in response.data]
-            return model_names
+            return [model.id for model in response.data]
         except Exception as e:
             logger.error(e)
             return []
@@ -99,12 +114,20 @@ async def get_model_names(key:str,url:str) -> List[str]:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=30),  # 指数退避
-    retry=retry_if_exception_type((RateLimitError, APIConnectionError, APITimeoutError)),
+    retry=retry_if_exception_type(
+        (RateLimitError, APIConnectionError, APITimeoutError)
+    ),
     before=_on_before,
     after=_on_after,
     reraise=True,  # 抛出原始异常
 )
-async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,messages:List[Dict[str,str]]) -> ChatCompletionMessage:
+async def send_messages_to_ai(
+    key: str,
+    url: str,
+    model_name: str,
+    temperature: float,
+    messages: list[dict[str, str]],
+) -> ChatCompletionMessage:
     async with semaphore:
         tools = mcp_manger.all_tools if mcp_manger is not None else []
         client = AsyncOpenAI(base_url=url, api_key=key, timeout=config.api_timeout)
@@ -126,24 +149,27 @@ async def send_messages_to_ai(key:str,url:str,model_name:str,temperature:float,m
             )
             return chat_completion.choices[0].message
         except AuthenticationError as e:
-            logger.warning("认证失败: {}".format(e))
+            logger.warning(f"认证失败: {e}")
             raise
         except APIStatusError as e:
-            logger.warning("业务异常: {}".format(e))
+            logger.warning(f"业务异常: {e}")
             raise
         except Exception as e:
-            logger.warning("未知异常: {}".format(e))
+            logger.warning(f"未知异常: {e}")
             raise
 
 
-async def get_config_by_id(sid: int, session: AsyncSession):
+async def get_config_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid, Settings.is_enabled == 1)
         result = await session.execute(smt)
         row = result.scalars().first()
         # 一般就提取第一个配置文件
         if row is None:
-            logger.warning("config not found, use default config : 当前配置未找到，使用默认配置")
+            logger.warning(
+                "config not found, use default config : "
+                "当前配置未找到，使用默认配置"
+            )
             smt_default = select(Settings).where(Settings.id == 1)
             result_default = await session.execute(smt_default)
             row_default = result_default.scalars().first()
@@ -155,15 +181,16 @@ async def get_config_by_id(sid: int, session: AsyncSession):
         return row
 
 
-async def get_all_config_by_id(sid: int, session: AsyncSession):
+async def get_all_config_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == sid)
         result = await session.execute(smt)
-        row = result.scalars().all()
-        return row
+        return result.scalars().all()
 
 
-async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: AsyncSession):
+async def del_config_by_config_id_and_uid(
+    config_id: int, uid: str, session: AsyncSession
+):
     async with semaphore_sql:
         # 保证只能操作自己的配置
         smt = select(Settings).where(Settings.id == config_id, Settings.user_id == uid)
@@ -171,16 +198,21 @@ async def del_config_by_config_id_and_uid(config_id: int, uid: int, session: Asy
         _res = result.scalar_one_or_none()
         if _res is None:
             return -1
-        else:
-            await session.delete(_res)
-            await session.commit()
-            return 0
+        await session.delete(_res)
+        await session.commit()
+        return 0
 
 
-async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: bool, user_id: int) -> int:
-    # 修改 config_id 的 is_enable 为 bool(target)
+async def switch_is_enable_by_id(
+    config_id: int,
+    session: AsyncSession,
+    target: bool,
+    user_id: str,
+) -> int:
     async with semaphore_sql:
-        smt = select(Settings).where(Settings.id == config_id, Settings.user_id == user_id)
+        smt = select(Settings).where(
+            Settings.id == config_id, Settings.user_id == user_id
+        )
         result = await session.execute(smt)
         data = result.scalars().first()
         if data is None:
@@ -191,8 +223,9 @@ async def switch_is_enable_by_id(config_id: int, session: AsyncSession, target: 
         return 0
 
 
-async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id: int) -> int | dict:
-    # 将 用户 user_id 的 配置文件 config_id 修改为 True , 其他为 false
+async def change_is_enable_by_id(
+    config_id: int, session: AsyncSession, user_id: str
+) -> int | dict:
     async with semaphore_sql:
         smt = select(Settings).where(Settings.user_id == user_id)
         result = await session.execute(smt)
@@ -209,25 +242,27 @@ async def change_is_enable_by_id(config_id: int, session: AsyncSession, user_id:
                 item.is_enabled = False
         # session.add(data)
         await session.commit()
-        return {"_changed_to_true": _changed_to_true, "_changed_to_false": _changed_to_false}
+        return {
+            "_changed_to_true": _changed_to_true,
+            "_changed_to_false": _changed_to_false,
+        }
 
 
-async def get_comments_by_id(sid: int, session: AsyncSession):
+async def get_comments_by_id(sid: str, session: AsyncSession):
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
-        raw = result.scalars().first()
-        return raw
+        return result.scalars().first()
 
 
-async def save_comments_by_id(sid: int, session: AsyncSession, msg: str):
+async def save_comments_by_id(sid: str, session: AsyncSession, msg: str):
     async with semaphore_sql:
         raw = AIHelperComments(comment_id=sid, message=msg)
         session.add(raw)
         await session.commit()
 
 
-async def update_comments_by_id(sid: int, session: AsyncSession, msg: str) -> int:
+async def update_comments_by_id(sid: str, session: AsyncSession, msg: str) -> int:
     async with semaphore_sql:
         stmt = select(AIHelperComments).where(AIHelperComments.comment_id == sid)
         result = await session.execute(stmt)
@@ -240,17 +275,18 @@ async def update_comments_by_id(sid: int, session: AsyncSession, msg: str) -> in
         return 0
 
 
-async def get_all_comment_ids(session: AsyncSession) -> List[int]:
+async def get_all_comment_ids(session: AsyncSession) -> list[str]:
     async with semaphore_sql:
         stmt = select(AIHelperComments.comment_id)
         result = await session.execute(stmt)
-        id_list = list(result.scalars().all())
-        return id_list
+        return list(result.scalars().all())
 
 
-async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: int) -> str:
+async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: str) -> str:
     # 保存信息到文件, 完成上传
-    temp_path = store.get_plugin_cache_file(f"{user_id}_{msg_type}_{time.time()}.txt.bak")
+    temp_path = store.get_plugin_cache_file(
+        f"{user_id}_{msg_type}_{time.time()}.txt.bak"
+    )
     try:
         async with aiofiles.open(temp_path, mode="w", encoding="utf-8") as f:
             await f.write(_raw_msg)
@@ -258,5 +294,4 @@ async def save_comments_to_file(_raw_msg: str, msg_type: str, user_id: int) -> s
         logger.error(f"save_comments_to_file failed: {e}")
         return ""
 
-    _remote_path = await public_api.upload_file(str(temp_path))
-    return _remote_path
+    return await public_api.upload_file(str(temp_path))
