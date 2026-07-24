@@ -5,7 +5,14 @@
 
 version: 2
 updates:
-  - package-ecosystem: "uv" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "weekly" # 建议改为 weekly 或 monthly，避免每天被打扰
+    open-pull-requests-limit: 3 # 限制同时存在的 Dependabot PR 最大数量（默认是 5）
+
+    # 关键配置：分组更新
+    groups:
+      python-dependencies:
+        patterns:
+          - "*" # 将所有 Python 依赖合并到同一个 PR 中更新
