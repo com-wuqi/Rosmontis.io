@@ -3103,7 +3103,7 @@ requires-dist = [
     { name = "sse-starlette", specifier = ">=3.4.5" },
     { name = "tenacity", specifier = ">=9.1.4" },
     { name = "tokenizers", specifier = ">=0.23.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
     { name = "websockets", specifier = ">=16.0" },
 ]
 
