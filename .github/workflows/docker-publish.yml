@@ -30,12 +30,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: '3.14'
-          enable-cache: true
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 

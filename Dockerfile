@@ -27,6 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+# 复制入口脚本
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
 # 复制项目文件
 COPY . .
 
@@ -40,9 +43,6 @@ EXPOSE 8080
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import nonebot" || exit 1
-
-# 复制入口脚本
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # 设置入口点
 ENTRYPOINT ["docker-entrypoint.sh"]
