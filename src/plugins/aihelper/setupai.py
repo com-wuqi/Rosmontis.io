@@ -4,7 +4,7 @@ from nonebot.adapters import Event,Message
 from nonebot.params import ArgPlainText, CommandArg
 from nonebot.typing import T_State
 
-from ..shared.adapter_utils import resolve_session, get_sender_id
+from src.plugins.shared.adapter_utils import resolve_session, get_sender_id
 
 require("nonebot_plugin_orm")
 from .aihelper_handles import *

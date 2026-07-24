@@ -6,7 +6,7 @@ from nonebot.adapters import Event
 from nonebot.plugin import PluginMetadata
 
 from .config import Config
-from ..shared.adapter_utils import get_sender_id, resolve_session
+from src.plugins.shared.adapter_utils import get_sender_id, resolve_session
 
 __plugin_meta__ = PluginMetadata(
     name="mcp_support",
@@ -21,23 +21,22 @@ driver = get_driver()
 
 from .MultiMCPManager import MultiMCPManager
 
-if config.is_enable:
-    mcp_manger = MultiMCPManager()
-else:
-    mcp_manger = None
-
+mcp_manger = MultiMCPManager() if config.is_enable else None
+mcp_manger_lock = asyncio.Lock()
 
 @driver.on_startup
 async def _init_mcp_support():
     if mcp_manger is not None:
-        await mcp_manger.connect_all()
+        async with mcp_manger_lock:
+            await mcp_manger.connect_all()
 
 
 @driver.on_shutdown
 async def _shutdown_mcp_support():
     if mcp_manger is not None:
         try:
-            await mcp_manger.close_all()
+            async with mcp_manger_lock:
+                await mcp_manger.close_all()
         except asyncio.CancelledError:
             pass
 
@@ -64,8 +63,9 @@ async def mcp_reload_handle(event: Event):
     if mcp_manger is None:
         await mcp_reload.finish("mcp is disabled")
         return
-    await mcp_reload.send("mcp is closing")
-    await mcp_manger.close_all()
-    await mcp_reload.send("mcp is starting")
-    await mcp_manger.connect_all()
-    await mcp_reload.finish("mcp is reloaded")
+    async with mcp_manger_lock:
+        await mcp_reload.send("mcp is closing")
+        await mcp_manger.close_all()
+        await mcp_reload.send("mcp is starting")
+        await mcp_manger.connect_all()
+        await mcp_reload.finish("mcp is reloaded")

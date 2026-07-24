@@ -1,20 +1,20 @@
-from nonebot import on_command, logger
+from nonebot import logger, on_command
 from nonebot.adapters import Bot, Event, Message
-from nonebot.params import CommandArg, Arg
+from nonebot.params import Arg, CommandArg
 from nonebot.typing import T_State
 
-from . import tts_api_handle, config
-from ..shared.adapter_utils import (
-    resolve_session,
-    get_sender_id,
-    get_attachment_segments,
-    download_attachment,
+from src.plugins.shared.adapter_utils import (
     build_file_message,
+    download_attachment,
+    get_attachment_segments,
+    get_event_bot,
+    get_sender_id,
+    resolve_session,
     save_bytes_to_cache,
     send_reply_with_event,
-    get_event_bot,
 )
 
+from . import config, tts_api_handle
 
 if config.is_enable_gpt_sovits:
     gpt_tts = on_command("gpt-tts")

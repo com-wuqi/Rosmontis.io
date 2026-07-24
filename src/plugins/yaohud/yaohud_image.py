@@ -1,12 +1,13 @@
 from nonebot import on_command
-from nonebot.adapters import Event, Bot
+from nonebot.adapters import Bot, Event
 
-from .yaohud_image_handle import get_acg
-from ..shared.adapter_utils import (
-    resolve_session,
+from src.plugins.shared.adapter_utils import (
     build_file_message,
+    resolve_session,
     send_reply_with_event,
 )
+
+from .yaohud_image_handle import get_acg
 
 acg_adaptive = on_command("acg adaptive")
 acg_ai = on_command("acg ai")

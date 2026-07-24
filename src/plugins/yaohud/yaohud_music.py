@@ -1,9 +1,10 @@
 from nonebot import on_command
-from nonebot.adapters import Event, Bot, Message
-from nonebot.params import CommandArg, Command
+from nonebot.adapters import Bot, Event, Message
+from nonebot.params import Command, CommandArg
+
+from src.plugins.shared.adapter_utils import build_file_message, send_reply_with_event
 
 from .yaohud_music_handle import get_common_music
-from ..shared.adapter_utils import build_file_message, send_reply_with_event
 
 netease_music = on_command("163mu")
 qq_music = on_command("qqmu")

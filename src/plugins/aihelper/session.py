@@ -54,6 +54,8 @@ async def _ensure_session_loaded(sid: str, sender_id: str = "") -> None:
     if sid in _Messages_dicts:
         return
     msgs, active = await _session_load(sid)
+    if msgs != _Messages_dicts.get(sid) or active != _ai_switch.get(sid):
+        logger.warning("_ensure_session_loaded use redis data to cover memory")
     _Messages_dicts[sid] = msgs
     _ai_switch[sid] = active
     if active:

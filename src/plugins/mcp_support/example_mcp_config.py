@@ -27,6 +27,7 @@ class McpServerConfig:
 # 以下是配置项
 # 工作目录可以自定义, 但是注意需要自行创建
 mcp_init_timeout = 180  # 初始化时间限制 (加载工具列表前)
+mcp_shutdown_timeout = 180  # 关闭时间限制
 mcp_configs = [
     # McpServerConfig(
     #     name="filesystem",

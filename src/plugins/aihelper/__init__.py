@@ -1,13 +1,14 @@
 import asyncio
 
 import redis.asyncio as aioredis
-from nonebot import get_driver, get_plugin_config, Bot
+from nonebot import Bot, get_driver, get_plugin_config
 from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 
+from src.plugins.shared.adapter_utils import get_adapter_name
+
 from .config import Config
 from .models import *
-from ..shared.adapter_utils import get_adapter_name
 
 __plugin_meta__ = PluginMetadata(
     name="aiHelper",
@@ -49,7 +50,7 @@ if config.is_enable:
 
         _redis = aioredis.from_url(config.redis_url, decode_responses=True)
         await _redis.ping()
-        logger.info(f"Redis connected: {config.redis_url}")
+        logger.info("Redis connected")
 
         for stream in (_STREAM_INCOMING, _STREAM_TASKS):
             try:

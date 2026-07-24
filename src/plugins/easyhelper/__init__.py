@@ -1,5 +1,5 @@
 from nonebot import get_plugin_config
-from nonebot import on_command
+from nonebot import on_command,get_driver
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
@@ -16,12 +16,13 @@ __plugin_meta__ = PluginMetadata(
 config = get_plugin_config(Config)
 
 request_help = on_command("get-help")
-
+_command_start = get_driver().config.command_start
 
 @request_help.handle()
 async def request_help_handle(args: Message = CommandArg()):
     # 帮助
-    _string = """
+    _string = f"""
+    ！命令需要包含以下符号之一才会被调用：{_command_start}
     用法 get-help [类型]
     类型包含:
     ai-talk : AI 对话相关

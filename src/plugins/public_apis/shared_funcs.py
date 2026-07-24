@@ -10,8 +10,9 @@ from nonebot import require
 from nonebot.log import logger
 
 require("nonebot_plugin_localstore")
-import nonebot_plugin_localstore as store
 import os
+
+import nonebot_plugin_localstore as store
 
 from . import config
 from .napcatqq_upload_stream import OneBotUploadTester
@@ -58,7 +59,7 @@ async def upload_file(path: str) -> str:
         if not dst.is_dir() and dst.exists():
             raise FileNotFoundError(dst)
         dst.mkdir(parents=True, exist_ok=True)
-        dst_file = dst / src.name
+        dst_file = dst / f"{time.time()}-{src.name}"
         shutil.copy2(src, dst_file)
         return str(dst_file)
     async with semaphore_upload:
@@ -114,22 +115,24 @@ async def download_file(url: str, save_path: str, header: dict | None = None) ->
     }
     headers = header if header is not None else _header
 
-    async with semaphore_download:
-        async with httpx.AsyncClient(
+    async with (
+        semaphore_download,
+        httpx.AsyncClient(
             headers=headers,
             http2=True,
             follow_redirects=True,
             max_redirects=5,
             timeout=120,
-        ) as client:
-                try:
-                    async with client.stream("GET", url) as response:
-                        response.raise_for_status()  # 检查 HTTP 错误
-                        async with aiofiles.open(save_path, "wb") as f:
-                            async for chunk in response.aiter_bytes(chunk_size=262144):
-                                await f.write(chunk)
-                        return 0
-                except Exception as e:
-                    logger.warning(e)
-                    traceback.print_exc()
-                    return -1
+        ) as client,
+    ):
+        try:
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()  # 检查 HTTP 错误
+                async with aiofiles.open(save_path, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=262144):
+                        await f.write(chunk)
+                return 0
+        except Exception as e:
+            logger.warning(e)
+            traceback.print_exc()
+            return -1

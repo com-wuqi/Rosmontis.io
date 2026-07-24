@@ -24,9 +24,18 @@ _token_bucket = public_api.TokenBucket(
 # markitdown[docx,pdf,pptx,xls,xlsx]==0.1.6
 
 _MARKITDOWN_SUPPORTED_EXT = {
-    ".png", ".jpg", ".jpeg",
-    ".webp", ".gif", ".py",
-    ".java"
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".py",
+    ".java",
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xls",
+    ".xlsx",
 }
 
 
@@ -72,7 +81,7 @@ async def read_markitdown_file(file_name: str, file_url: str) -> str | None:
             if _try_download != 0:
                 raise RuntimeError("download failed")
         _return = await async_convert(file_path)
-        logger.debug(f"read markitdown success:\n{_return}")
+        logger.debug(f"read markitdown success: {len(_return)} characters")
     except Exception as e:
         logger.warning(f"failed to read markitdown file: {e}")
         traceback.print_exc()

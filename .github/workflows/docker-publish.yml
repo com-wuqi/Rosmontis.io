@@ -36,13 +36,6 @@ jobs:
           python-version: '3.14'
           enable-cache: true
 
-      - name: Run quick tests before build
-        env:
-          DRIVER: "~aiohttp"
-        run: |
-          uv sync --frozen --all-groups
-          uv run pytest tests/ -v --tb=short --disable-warnings || echo "Tests failed, but continuing with build (check separate test workflow for details)"
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 

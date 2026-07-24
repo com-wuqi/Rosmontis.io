@@ -287,7 +287,7 @@ async def download_to_cache(bot: Bot, attachment: dict) -> str | None:
     file_key = attachment.get("file_key")
 
     if file_url:
-        tmp_path = store.get_plugin_cache_file(f"dl_{file_name}")
+        tmp_path = store.get_plugin_cache_file(f"dl-{time.time()}-{file_name}")
         code = await download_file(str(file_url), str(tmp_path))
         return str(tmp_path) if code == 0 else None
 

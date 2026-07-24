@@ -3,36 +3,43 @@ import os
 import socket
 import traceback
 
-from nonebot import on_command, on_message
-from nonebot import require
-from nonebot.adapters import Event, Bot
+from nonebot import get_driver, on_command, on_message, require
+from nonebot.adapters import Bot, Event
 from nonebot.internal.params import ArgPlainText
 
-from .system_prompts import tool_system_prompts_list
-from ..ai_file_reader import get_file_from_event
-from ..shared.adapter_utils import (
-    resolve_session,
-    get_sender_id,
-    get_message_text,
-    is_attachment_message,
+from src.plugins.ai_file_reader import get_file_from_event
+from src.plugins.shared.adapter_utils import (
     can_manage_session,
-    send_reply,
     get_adapter_name,
+    get_message_text,
+    get_sender_id,
+    is_attachment_message,
+    resolve_session,
+    send_reply,
 )
+
+from .system_prompts import tool_system_prompts_list
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import async_scoped_session
-from . import get_redis, _STREAM_INCOMING, _STREAM_TASKS, _GROUP
+
+from . import _GROUP, _STREAM_INCOMING, _STREAM_TASKS, get_redis
+
 # require("nonebot_plugin_apscheduler")
 from .aihelper_handles import *
-
 from .session import (
-    _Messages_dicts, _ai_switch, _config_settings,
-    _session_save, _session_delete, _ensure_session_loaded,
+    _ai_switch,
+    _config_settings,
+    _ensure_session_loaded,
+    _Messages_dicts,
+    _session_delete,
+    _session_save,
     store_open_id,
 )
 
-_locks: Dict[str, asyncio.Lock] = {}
+_superusers = get_driver().config.superusers
+
+_locks: dict[str, asyncio.Lock] = {}
 _locks_lock = asyncio.Lock()
 
 _STREAM_IN = _STREAM_INCOMING  # 信息进入
@@ -306,7 +313,12 @@ async def ai_chat_handle(event: Event, bot: Bot):
                 }
             )
             await _session_save(session_id, _raw_message, active=True)
-        _counter, _file_text = await get_file_from_event(event=event, bot=bot)
+        try:
+            _counter, _file_text = await get_file_from_event(event=event, bot=bot)
+        except Exception:
+            logger.exception("get_file_from_event failed")
+            _counter = 0
+            _file_text = ""
         # 文件处理入口，这个函数可能通过redis恢复执行吗(event可以序列化/反序列化吗)
         if _counter == 0:
             logger.warning("attachment detected but no file processed")
@@ -401,6 +413,9 @@ async def zip_memory_ai_handle(event: Event,session: async_scoped_session):
     session_id, session_type = resolve_session(event)
     lock = await get_session_lock(session_id)
     config_sid = get_sender_id(event) if session_type == "private" else session_id
+    if config_sid not in _superusers:
+        await zip_memory_ai.finish("Permission denied")
+        return
     row = await get_config_by_id(sid=config_sid, session=session)
     # 这里使用的时候内存中应该有配置信息, 但是压缩需要 token , 还是由发起者承担
     async with lock:
@@ -431,7 +446,11 @@ async def zip_memory_ai_handle(event: Event,session: async_scoped_session):
 
 
 @zip_db_ai.handle()
-async def zip_db_ai_handle():
+async def zip_db_ai_handle(event: Event):
+    sid = get_sender_id(event)
+    if sid not in _superusers:
+        await zip_memory_ai.finish("Permission denied")
+        return
     await zip_db_ai.send("zip_db_ai.handle run...")
 
 
@@ -482,6 +501,9 @@ async def single_user_event_handle(
     _raw_message: list = _Messages_dicts[_session_id]
     if not _raw_message:
         logger.warning("single_user_event_handle: _raw_message")
+        return
+    if not _ai_switch[_session_id]:
+        logger.warning("single_user_event_handle: _ai_switch")
         return
     _res = None
     async with lock:

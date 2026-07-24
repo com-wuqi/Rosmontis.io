@@ -93,7 +93,7 @@
 - **用途**：查看订单状态、取餐码、配送信息
 - **入参**：`orderId`（string，必填）
 - **订单状态码**：`10`=待付款 → `20`=下单成功 → `30`=制作中 → `60`=等待取餐 → `80`=已完成 → `100`=已取消
-- **响应关键字段**：`orderStatus`、`takeMealCodeInfo.code`（取餐码）、`dispatchInfo`（配送员信息）
+- **响应关键字段**：`orderStatus`、`takeMealCodeInfo.code`（取餐码, 不是取餐二维码）、`dispatchInfo`（配送员信息）
 
 #### `cancelOrder` — 取消订单
 
@@ -134,4 +134,3 @@
 
 根据测试，取餐二维码的生成没有官方api, 是 `queryOrderDetailInfo` 返回的 `takeMealCodeInfo` 字段下的 `takeOrderId`
 直接生成的二维码
-可以考虑构建 https://api.2dcode.biz/v1/create-qr-code?data= 的url发送给用户(data=后跟字符串，不需要引号)

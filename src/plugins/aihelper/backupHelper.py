@@ -10,7 +10,7 @@ import nonebot_plugin_localstore as store
 from nonebot_plugin_orm import async_scoped_session
 
 from .aihelper_handles import get_comments_by_id
-from ..shared.adapter_utils import resolve_session, build_file_message
+from src.plugins.shared.adapter_utils import resolve_session, build_file_message
 
 
 backup_comments = on_command("ai cm bk")

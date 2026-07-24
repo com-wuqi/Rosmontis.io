@@ -3,7 +3,7 @@ from nonebot.adapters import Event, Bot, Message
 from nonebot.params import CommandArg
 
 from .yaohud_ai_handle import get_index_tts2, get_weijin, get_yaohu_picture
-from ..shared.adapter_utils import (
+from src.plugins.shared.adapter_utils import (
     resolve_session,
     build_file_message,
     send_reply_with_event,

@@ -8,7 +8,8 @@ from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 from pydantic import BaseModel
 
-from ..shared.adapter_utils import download_to_cache, get_attachment_segments
+from src.plugins.shared.adapter_utils import download_to_cache, get_attachment_segments
+
 from .config import Config
 
 __plugin_meta__ = PluginMetadata(

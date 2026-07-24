@@ -12,10 +12,20 @@ from mcp.types import LoggingMessageNotificationParams
 from nonebot.log import logger
 
 try:
-    from .mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
-except ModuleNotFoundError:
-    logger.warning("导入mcp_config失败，降级使用example.mcp_config")
-    from .example_mcp_config import McpServerConfig, mcp_init_timeout, mcp_configs
+    from .mcp_config import (
+        McpServerConfig,
+        mcp_init_timeout,
+        mcp_configs,
+        mcp_shutdown_timeout
+    )
+except (ModuleNotFoundError, ImportError) as e:
+    logger.warning(f"导入mcp_config失败，降级使用example.mcp_config: {e}")
+    from .example_mcp_config import (
+        McpServerConfig,
+        mcp_init_timeout,
+        mcp_configs,
+        mcp_shutdown_timeout,
+    )
 
 
 class MultiMCPManager:
@@ -210,7 +220,10 @@ class MultiMCPManager:
         """ 关闭所有连接 """
         self._stop_event.set()  # 触发关闭事件
         try:
-            await asyncio.gather(*self._tasks, return_exceptions=True)
+            await asyncio.wait_for(
+                asyncio.gather(*self._tasks, return_exceptions=True),
+                mcp_shutdown_timeout
+            )
         except Exception as e:
             logger.warning(f"close_all(self) Exception {e}")
             for task in self._tasks:
