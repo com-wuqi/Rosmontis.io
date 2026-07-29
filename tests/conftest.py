@@ -10,6 +10,8 @@ import os
 
 os.environ.setdefault("SENTRY_DSN", "")
 os.environ.setdefault("SENTRY_SEND_DEFAULT_PII", "false")
+os.environ.setdefault("ALEMBIC_STARTUP_CHECK", "false")
+os.environ.setdefault("APSCHEDULER_AUTOSTART", "false")
 
 import nonebot
 
@@ -25,6 +27,8 @@ nonebot.init(
     localstore_use_cwd=True,
     sentry_dsn="",
     sentry_send_default_pii="false",
+    alembic_startup_check=False,
+    apscheduler_autostart=False,
     aihelper__is_enable=True,
     aihelper__tools_max_once_calls=5,
     aihelper__is_enable_tool_prompt=False,

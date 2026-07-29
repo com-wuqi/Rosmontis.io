@@ -359,3 +359,59 @@ def make_settings_row():
             is_enabled=is_enabled,
         )
     return _make
+
+
+# ---------------------------------------------------------------------------
+# Real Redis fixtures (for E2E pipeline / worker scaling tests)
+# ---------------------------------------------------------------------------
+
+_REAL_REDIS_URL = os.environ.get("AIHELPER__REDIS_URL", "redis://localhost:6379/0")
+
+
+@pytest_asyncio.fixture(scope="function")
+async def real_redis_streams():
+    """Real Redis fixture with fresh connection per test."""
+    import redis.asyncio as aioredis
+    from src.plugins.aihelper import _STREAM_INCOMING, _STREAM_TASKS, _GROUP
+
+    client = aioredis.from_url(_REAL_REDIS_URL, decode_responses=True)
+
+    try:
+        await client.ping()
+    except Exception:
+        await client.aclose()
+        pytest.skip(f"Real Redis not available at {_REAL_REDIS_URL}")
+
+    for stream in (_STREAM_INCOMING, _STREAM_TASKS):
+        try:
+            await client.delete(stream)
+        except Exception:
+            pass
+
+    for stream in (_STREAM_INCOMING, _STREAM_TASKS):
+        try:
+            await client.xgroup_create(stream, _GROUP, id="0", mkstream=True)
+        except aioredis.ResponseError as e:
+            if "BUSYGROUP" not in str(e):
+                raise
+
+    import src.plugins.aihelper as aimod
+    orig_redis = aimod._redis
+    orig_get = aimod.get_redis
+    aimod._redis = client
+
+    def _get_redis():
+        return client
+
+    aimod.get_redis = _get_redis
+
+    yield client
+
+    aimod._redis = orig_redis
+    aimod.get_redis = orig_get
+
+    for stream in (_STREAM_INCOMING, _STREAM_TASKS):
+        try:
+            await client.xtrim(stream, 0)
+        except Exception:
+            pass
