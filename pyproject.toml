@@ -80,6 +80,13 @@ test = [
     "nonebug>=0.4.4",
     "respx>=0.23.1",
 ]
+bench = [
+    "pytest-benchmark>=5.1.0",
+    "fakeredis[lua]>=2.30.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+]
 [tool.nonebot]
 plugin_dirs = ["src/plugins"]
 builtin_plugins = ["echo"]
