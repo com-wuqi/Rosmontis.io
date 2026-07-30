@@ -38,7 +38,7 @@ dependencies = [
     "kubernetes>=36.0.2",
     "loguru>=0.7.3",
     "markitdown[docx,pdf,pptx,xls,xlsx]>=0.1.6",
-    "mcp>=2.0.0",
+    "mcp<2.0",
     "nb-cli>=1.7.4",
     "onnxruntime>=1.28.0",
     "openai>=2.50.0",
@@ -67,6 +67,7 @@ dependencies = [
     "uvicorn[standard]>=0.52.0",
     "websockets>=16.0",
     "gradio-client>=2.5.0",
+    "fastmcp>=3.2.0",
 ]
 
 [dependency-groups]
