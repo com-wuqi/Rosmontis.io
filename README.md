@@ -94,8 +94,9 @@ Rosmontis/
    pip install -r requirements.txt
    ```
 4. **配置snowluma**
-   请参考 `方式二：Docker部署`   
-   官方文档 `https://snowluma.github.io/guide/deploy/docker.html`
+
+   官方文档 `https://snowluma.github.io/`  
+   如果使用`docker`请参考下面的章节
 
 4. **数据库初始化**
    ```bash
@@ -163,7 +164,7 @@ Rosmontis/
    - 访问 `http://127.0.0.1:5099` (SnowLuma管理界面)
    - 打开 `节点配置` (或访问 `http://127.0.0.1:5099/config`)
    - 编辑 `WS 服务端`
-      - 主机: `0.0.0.0`
+      - 主机: `0.0.0.0` _# 26.8.11更新：默认的 `127.0.0.0` 可能会导致连接问题_
       - 端口: `3001`
       - 路径：`/`
       - 信息格式：`数组`
