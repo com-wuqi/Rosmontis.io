@@ -4,8 +4,8 @@ import chromadb
 import httpx
 from buildin_mcp_share import *
 from e2b_code_interpreter import AsyncSandbox, SandboxLifecycle, SandboxState
+from fastmcp import Context, FastMCP
 from knowledge_tools import *
-from mcp.server.fastmcp import Context, FastMCP
 
 env_dict = dict(os.environ)
 
@@ -219,13 +219,9 @@ async def call_web_search(
             response.raise_for_status()
             raw_data = response.json()
             data = {}
-            _ids = 0
-            for d in raw_data["data"]["webPages"]["value"]:
+            for i, d in enumerate(raw_data["data"]["webPages"]["value"]):
                 # 数据清洗, 字段更易于阅读
-                data[_ids] = (
-                    f"标题: {d['name']}\n, url: {d['url']}, 总结: {d['summary']}"
-                )
-                _ids += 1
+                data[i] = f"标题: {d['name']}\n, url: {d['url']}, 总结: {d['summary']}"
 
             return {"success": data}
         except httpx.TimeoutException:
@@ -240,9 +236,7 @@ async def call_web_search(
                     }
                 )
             )
-            return {
-                "error": (f"HTTP 错误 {e.response.status_code}: {e.response.text}")
-            }
+            return {"error": f"HTTP 错误 {e.response.status_code}: {e.response.text}"}
         except KeyError as e:
             await ctx.debug(str({"error": f"keyError: {e}"}))
             return {"error": f"keyError: {e}"}
@@ -278,7 +272,7 @@ async def run_code_in_e2b(
         _lock = get_sandbox_lock(user_id=user_id)
         async with _lock:
             sandbox = await get_sandbox(user_id=user_id, timeout=timeout, ctx=ctx)
-            if type(sandbox) == str:
+            if type(sandbox) is str:
                 return {"fail": sandbox}
 
             if len(requirements) != 0:

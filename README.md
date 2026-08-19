@@ -1,11 +1,5 @@
 # Rosmontis - 现代化AI机器人
 
-## 这是开发分支！
-
-这里的版本不保证可用性，请前往[releases](https://github.com/com-wuqi/Rosmontis.io/releases)下载`Pre-release`或`Latest`
-版本  
-我们正在进行重大迁移和重构，不建议使用这个分支的代码
-
 ![License](https://img.shields.io/badge/License-MIT-white.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![NoneBot](https://img.shields.io/badge/NoneBot-v2.x-green)
@@ -100,8 +94,9 @@ Rosmontis/
    pip install -r requirements.txt
    ```
 4. **配置snowluma**
-   请参考 `方式二：Docker部署`   
-   官方文档 `https://snowluma.github.io/guide/deploy/docker.html`
+
+   官方文档 `https://snowluma.github.io/`  
+   如果使用`docker`请参考下面的章节
 
 4. **数据库初始化**
    ```bash
@@ -169,7 +164,7 @@ Rosmontis/
    - 访问 `http://127.0.0.1:5099` (SnowLuma管理界面)
    - 打开 `节点配置` (或访问 `http://127.0.0.1:5099/config`)
    - 编辑 `WS 服务端`
-      - 主机: `0.0.0.0`
+      - 主机: `0.0.0.0` _# 26.8.11更新：默认的 `127.0.0.0` 可能会导致连接问题_
       - 端口: `3001`
       - 路径：`/`
       - 信息格式：`数组`

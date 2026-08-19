@@ -686,13 +686,19 @@ class MessageHandleWorkers:
             is_event_handled = False
             msg_id = None
             try:
-                result = await get_redis().xreadgroup(
-                    groupname=_GROUP,
-                    consumername=consumer_name,
-                    streams={_STREAM_OUT: ">"},
-                    count=1,
-                    block=1000,
-                )
+                try:
+                    result = await asyncio.wait_for(
+                        get_redis().xreadgroup(
+                            groupname=_GROUP,
+                            consumername=consumer_name,
+                            streams={_STREAM_OUT: ">"},
+                            count=1,
+                            block=0,
+                        ),
+                        timeout=1.0,
+                    )
+                except asyncio.TimeoutError:
+                    continue
                 if not result:
                     continue
 
@@ -743,8 +749,11 @@ class MessageHandleWorkers:
         for _worker in self._workers:
             _worker.cancel()
         try:
-            await asyncio.gather(*self._workers, return_exceptions=True)
-        except asyncio.CancelledError:
+            await asyncio.wait_for(
+                asyncio.gather(*self._workers, return_exceptions=True),
+                timeout=3.0,
+            )
+        except (asyncio.CancelledError, asyncio.TimeoutError):
             pass
         self._workers.clear()
 
@@ -754,13 +763,19 @@ class MessageHandleWorkers:
             if self._stop_signal.is_set():
                 return
             try:
-                result = await get_redis().xreadgroup(
-                    groupname=_GROUP,
-                    consumername=self._consumer_id,
-                    streams={_STREAM_IN: ">"},  # 只读新信息
-                    count=20,
-                    block=500,
-                )
+                try:
+                    result = await asyncio.wait_for(
+                        get_redis().xreadgroup(
+                            groupname=_GROUP,
+                            consumername=self._consumer_id,
+                            streams={_STREAM_IN: ">"},  # 只读新信息
+                            count=20,
+                            block=0,
+                        ),
+                        timeout=0.5,
+                    )
+                except asyncio.TimeoutError:
+                    result = None
             except Exception as e:
                 logger.exception("fail to read from Redis Stream")
                 await asyncio.sleep(0.5)
